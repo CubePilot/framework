@@ -2,14 +2,33 @@
 #include <common/helpers.h>
 #include <modules/uavcan_debug/uavcan_debug.h>
 
-static bool ms5611_read_prom(struct ms5611_instance_s* instance);
+#define MS5611_CMD_RESET                    0x1E
+#define MS5611_CMD_CVT_D1_256               0x40
+#define MS5611_CMD_CVT_D1_512               0x42
+#define MS5611_CMD_CVT_D1_1024              0x44
+#define MS5611_CMD_CVT_D1_2048              0x46
+#define MS5611_CMD_CVT_D1_4096              0x48
+#define MS5611_CMD_CVT_D2_256               0x50
+#define MS5611_CMD_CVT_D2_512               0x52
+#define MS5611_CMD_CVT_D2_1024              0x54
+#define MS5611_CMD_CVT_D2_2048              0x56
+#define MS5611_CMD_CVT_D2_4096              0x58
+#define MS5611_CMD_ADC_READ                 0x00
+#define MS5611_CMD_PROM_READ                0xA0
+
+static void ms5611_task_func(struct worker_thread_timer_task_s* task);
+
+static void ms5611_read_prom(struct ms5611_instance_s* instance);
+static void ms5611_compute_temperature_and_pressure(struct ms5611_instance_s* instance, float* pressure_pa, float* temperature_K);
 static uint32_t ms5611_read_adc(struct ms5611_instance_s* instance);
 static void ms5611_cmd(struct ms5611_instance_s* instance, uint8_t cmd);
 static void ms5611_read(struct ms5611_instance_s* instance, uint8_t addr, uint8_t n, uint8_t* buf);
 static bool crc4(uint16_t *prom);
 
-bool ms5611_init(struct ms5611_instance_s* instance, uint8_t spi_idx, uint32_t select_line)
-{
+void ms5611_init(struct ms5611_instance_s* instance, uint8_t spi_idx, uint32_t select_line, struct worker_thread_s* worker_thread, struct pubsub_topic_s* topic) {
+    instance->topic = topic;
+    instance->worker_thread = worker_thread;
+
     // Ensure sufficient power-up time has elapsed
     chThdSleep(MS2ST(100));
 
@@ -20,171 +39,130 @@ bool ms5611_init(struct ms5611_instance_s* instance, uint8_t spi_idx, uint32_t s
 
     chThdSleep(MS2ST(20));
 
-    if (!ms5611_read_prom(instance)) {
-        return false;
-    }
-    return true;
+    ms5611_read_prom(instance);
+
+    instance->process_step = 0;
+    ms5611_cmd(instance, MS5611_CMD_CVT_D2_4096);
+    worker_thread_add_timer_task(instance->worker_thread, &instance->task, ms5611_task_func, instance, LL_MS2ST(10), false);
 }
 
-bool ms5611_measure_temperature(struct ms5611_instance_s* instance) {
-    if (instance->temperature_read_started || instance->pressure_read_started) {
-        return false;
+static void ms5611_task_func(struct worker_thread_timer_task_s* task) {
+    struct ms5611_instance_s* instance = (struct ms5611_instance_s*)worker_thread_task_get_user_context(task);
+
+    switch(instance->process_step) {
+        case 0: {
+            instance->D2 = ms5611_read_adc(instance);
+            ms5611_cmd(instance, MS5611_CMD_CVT_D1_4096);
+            instance->conversion_start_time = chVTGetSystemTimeX();
+            break;
+        }
+        case 1: {
+            instance->D1 = ms5611_read_adc(instance);
+            ms5611_cmd(instance, MS5611_CMD_CVT_D2_4096);
+
+            if (instance->prom_read_ok) {
+                struct ms5611_sample_s sample;
+                sample.timestamp = instance->conversion_start_time;
+                ms5611_compute_temperature_and_pressure(instance, &sample.pressure_pa, &sample.temperature_K);
+                pubsub_publish_message(instance->topic, sizeof(sample), pubsub_copy_writer_func, &sample);
+            }
+            break;
+        }
     }
-    ms5611_cmd(instance, MS5611_CMD_CVT_D2_1024);
-    instance->temperature_read_started = true;
-    return true;
+
+    instance->process_step = (instance->process_step + 1) % 2;
+    worker_thread_timer_task_reschedule(instance->worker_thread, &instance->task, LL_MS2ST(10));
 }
 
-bool ms5611_measure_pressure(struct ms5611_instance_s* instance) {
-    if (instance->temperature_read_started || instance->pressure_read_started) {
-        return false;
-    }
-    ms5611_cmd(instance, MS5611_CMD_CVT_D1_1024);
-    instance->pressure_read_started = true;
-    return true;
-}
+static void ms5611_compute_temperature_and_pressure(struct ms5611_instance_s* instance, float* pressure_pa, float* temperature_K) {
+    uint32_t D1 = instance->D1;
+    uint32_t D2 = instance->D2;
 
-void ms5611_accum_temperature(struct ms5611_instance_s* instance)
-{
-    if (!instance->temperature_read_started) {
-        return;
-    }
-    instance->sD2 += ms5611_read_adc(instance);
-    instance->sD2_count++;
+    int32_t dT = D2 - ((uint32_t)instance->prom.s.c5_reference_temp << 8);
 
-    instance->temperature_read_started = false;
-}
+    int32_t TEMP = 2000 + (int32_t)(((int64_t)dT * instance->prom.s.c6_temp_coeff_temp) / (1<<23));
 
-void ms5611_accum_pressure(struct ms5611_instance_s* instance)
-{
-    if (!instance->pressure_read_started) {
-        return;
-    }
-    instance->sD1 += ms5611_read_adc(instance);
-    instance->sD1_count++;
+    int64_t OFF = ((int64_t)instance->prom.s.c2_pressure_offset << 16) + (((int64_t)instance->prom.s.c4_temp_coeff_pres_offset * dT) / (1<<7));
+    int64_t SENS = ((int64_t)instance->prom.s.c1_pressure_sens << 15) + (((int64_t)instance->prom.s.c3_temp_coeff_pres_sens * dT) / (1<<8));
 
-    instance->pressure_read_started = false;
-}
+    if (TEMP < 2000) {
+        int32_t T2 = SQ((int64_t)dT) / (1<<31);
+        int64_t OFF2 = 5 * SQ((int64_t)TEMP - 2000) / 2;
+        int64_t SENS2 = 5 * SQ((int64_t)TEMP - 2000) / 4;
 
-int32_t ms5611_read_temperature(struct ms5611_instance_s* instance)
-{
-    if (!instance->sD2_count) {
-        return 0;
-    }
-    uint32_t D2 = (uint32_t)(instance->sD2 / instance->sD2_count);
-    instance->sD2 = 0;
-    instance->sD2_count = 0;
-
-    /* temperature offset (in ADC units) */
-    int32_t dT = (int32_t)D2 - ((int32_t)instance->prom.s.c5_reference_temp << 8);
-
-    /* absolute temperature in centidegrees - note intermediate value is outside 32-bit range */
-    instance->TEMP = 2000 + (int32_t)(((int64_t)dT * instance->prom.s.c6_temp_coeff_temp) >> 23);
-
-    /* Perform MS5611 Caculation */
-
-    instance->OFF  = ((int64_t)instance->prom.s.c2_pressure_offset << 16) + (((int64_t)instance->prom.s.c4_temp_coeff_pres_offset * dT) >> 7);
-    instance->SENS = ((int64_t)instance->prom.s.c1_pressure_sens << 15) + (((int64_t)instance->prom.s.c3_temp_coeff_pres_sens * dT) >> 8);
-
-    /* MS5611 temperature compensation */
-
-    if (instance->TEMP < 2000) {
-
-        int32_t T2 = SQ(dT) >> 31;
-
-        int64_t f = SQ((int64_t)instance->TEMP - 2000);
-        int64_t OFF2 = 5 * f >> 1;
-        int64_t SENS2 = 5 * f >> 2;
-
-        if (instance->TEMP < -1500) {
-
-            int64_t f2 = SQ(instance->TEMP + 1500);
-            OFF2 += 7 * f2;
-            SENS2 += 11 * f2 >> 1;
+        if (TEMP < -1500) {
+            OFF2 += 7 * SQ(TEMP + 1500);
+            SENS2 += (11 * SQ(TEMP + 1500)) / 2;
         }
 
-        instance->TEMP -= T2;
-        instance->OFF  -= OFF2;
-        instance->SENS -= SENS2;
+        TEMP -= T2;
+        OFF  -= OFF2;
+        SENS -= SENS2;
     }
 
-    return instance->TEMP;
-}
+    int32_t P = (((D1 * SENS) / (1<<21)) - OFF) / (1<<15);
 
-int32_t ms5611_read_pressure(struct ms5611_instance_s* instance) {
-    if (!instance->sD1_count) {
-        return 0;
-    }
-    int64_t P = instance->sD1 / instance->sD1_count;
-    instance->sD1_count = 0;
-    instance->sD1 = 0;
-	P = (((P * instance->SENS) >> 21) - instance->OFF) >> 15;
+    *pressure_pa = P;
+    *temperature_K = TEMP*0.01f + 273.15f;
+};
 
-    instance->pressure_read_started = false;
-    return P;
-}
-
-static bool ms5611_read_prom(struct ms5611_instance_s* instance) {
+static void ms5611_read_prom(struct ms5611_instance_s* instance) {
     uint8_t val[3] = {0};
     uint8_t addr = MS5611_CMD_PROM_READ;
-    bool  prom_read_failed = true;
+
+    instance->prom_read_ok = false;
+
     for (uint8_t i = 0; i < 8; i++) {
         ms5611_read(instance, addr, 2, val);
         addr += 2;
         instance->prom.c[i] = (val[0] << 8) | val[1];
         if (instance->prom.c[i] != 0) {
-            prom_read_failed = false;
+            instance->prom_read_ok = true;
         }
     }
-    if (prom_read_failed) {
-        return false;
-    }
-    if (crc4(instance->prom.c)) {
-        return true;
-    }
-    return false;
+
+    instance->prom_read_ok = instance->prom_read_ok && crc4(instance->prom.c);
 }
 
-static bool crc4(uint16_t *prom)
-{
-	int16_t cnt;
-	uint16_t n_rem;
-	uint16_t crc_read;
-	uint8_t n_bit;
+static bool crc4(uint16_t *prom) {
+    int16_t cnt;
+    uint16_t n_rem;
+    uint16_t crc_read;
+    uint8_t n_bit;
 
-	n_rem = 0x00;
+    n_rem = 0x00;
 
-	/* save the read crc */
-	crc_read = prom[7];
+    /* save the read crc */
+    crc_read = prom[7];
 
-	/* remove CRC byte */
-	prom[7] = (0xFF00 & (prom[7]));
+    /* remove CRC byte */
+    prom[7] = (0xFF00 & (prom[7]));
 
-	for (cnt = 0; cnt < 16; cnt++) {
-		/* uneven bytes */
-		if (cnt & 1) {
-			n_rem ^= (uint8_t)((prom[cnt >> 1]) & 0x00FF);
+    for (cnt = 0; cnt < 16; cnt++) {
+        /* uneven bytes */
+        if (cnt & 1) {
+            n_rem ^= (uint8_t)((prom[cnt >> 1]) & 0x00FF);
 
-		} else {
-			n_rem ^= (uint8_t)(prom[cnt >> 1] >> 8);
-		}
+        } else {
+            n_rem ^= (uint8_t)(prom[cnt >> 1] >> 8);
+        }
 
-		for (n_bit = 8; n_bit > 0; n_bit--) {
-			if (n_rem & 0x8000) {
-				n_rem = (n_rem << 1) ^ 0x3000;
+        for (n_bit = 8; n_bit > 0; n_bit--) {
+            if (n_rem & 0x8000) {
+                n_rem = (n_rem << 1) ^ 0x3000;
 
-			} else {
-				n_rem = (n_rem << 1);
-			}
-		}
-	}
+            } else {
+                n_rem = (n_rem << 1);
+            }
+        }
+    }
 
-	/* final 4 bit remainder is CRC value */
-	n_rem = (0x000F & (n_rem >> 12));
-	prom[7] = crc_read;
+    /* final 4 bit remainder is CRC value */
+    n_rem = (0x000F & (n_rem >> 12));
+    prom[7] = crc_read;
 
-	/* return true if CRCs match */
-	return (0x000F & crc_read) == (n_rem ^ 0x00);
+    /* return true if CRCs match */
+    return (0x000F & crc_read) == (n_rem ^ 0x00);
 }
 
 static uint32_t ms5611_read_adc(struct ms5611_instance_s* instance) {
