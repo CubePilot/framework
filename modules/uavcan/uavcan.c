@@ -95,10 +95,10 @@ static struct uavcan_instance_s* uavcan_instance_list_head;
 
 #ifdef MODULE_PARAM_ENABLED
 #include <modules/param/param.h>
-#ifndef UAVCAN_DEFAULT_NODE_ID
-#define UAVCAN_DEFAULT_NODE_ID 0
+#ifndef APP_CONFIG_CAN_LOCAL_NODE_ID
+#define APP_CONFIG_CAN_LOCAL_NODE_ID 0
 #endif
-PARAM_DEFINE_UINT8_PARAM_STATIC(node_id_param, "uavcan.node_id", UAVCAN_DEFAULT_NODE_ID, 0, 125)
+PARAM_DEFINE_UINT8_PARAM_STATIC(node_id_param, "uavcan.node_id", APP_CONFIG_CAN_LOCAL_NODE_ID, 0, 125)
 #endif
 
 RUN_ON(UAVCAN_INIT) {
