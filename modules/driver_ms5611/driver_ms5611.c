@@ -42,8 +42,8 @@ void ms5611_init(struct ms5611_instance_s* instance, uint8_t spi_idx, uint32_t s
     ms5611_read_prom(instance);
 
     instance->process_step = 0;
-    ms5611_cmd(instance, MS5611_CMD_CVT_D2_4096);
-    worker_thread_add_timer_task(instance->worker_thread, &instance->task, ms5611_task_func, instance, LL_MS2ST(10), false);
+    ms5611_cmd(instance, MS5611_CMD_CVT_D2_1024);
+    worker_thread_add_timer_task(instance->worker_thread, &instance->task, ms5611_task_func, instance, LL_US2ST(2500), false);
 }
 
 static void ms5611_task_func(struct worker_thread_timer_task_s* task) {
@@ -51,14 +51,17 @@ static void ms5611_task_func(struct worker_thread_timer_task_s* task) {
 
     switch(instance->process_step) {
         case 0: {
+            // Read temperature and start pressure read
             instance->D2 = ms5611_read_adc(instance);
-            ms5611_cmd(instance, MS5611_CMD_CVT_D1_4096);
+            ms5611_cmd(instance, MS5611_CMD_CVT_D1_1024);
             instance->conversion_start_time = chVTGetSystemTimeX();
+            worker_thread_add_timer_task(instance->worker_thread, &instance->task, ms5611_task_func, instance, LL_US2ST(2500), false);
             break;
         }
         case 1: {
+            // Read pressure, publish temperature+pressure observation, start temperature read
             instance->D1 = ms5611_read_adc(instance);
-            ms5611_cmd(instance, MS5611_CMD_CVT_D2_4096);
+            ms5611_cmd(instance, MS5611_CMD_CVT_D2_1024);
 
             if (instance->prom_read_ok) {
                 struct ms5611_sample_s sample;
@@ -66,12 +69,12 @@ static void ms5611_task_func(struct worker_thread_timer_task_s* task) {
                 ms5611_compute_temperature_and_pressure(instance, &sample.pressure_pa, &sample.temperature_K);
                 pubsub_publish_message(instance->topic, sizeof(sample), pubsub_copy_writer_func, &sample);
             }
+            worker_thread_timer_task_reschedule(instance->worker_thread, &instance->task, LL_MS2ST(17));
             break;
         }
     }
 
     instance->process_step = (instance->process_step + 1) % 2;
-    worker_thread_timer_task_reschedule(instance->worker_thread, &instance->task, LL_MS2ST(10));
 }
 
 static void ms5611_compute_temperature_and_pressure(struct ms5611_instance_s* instance, float* pressure_pa, float* temperature_K) {
