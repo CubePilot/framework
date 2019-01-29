@@ -346,7 +346,7 @@ static void cancel_boot_timer(void) {
 
 static bool check_and_start_boot_timer(void) {
     if (app_info.shared_app_parameters && app_info.shared_app_parameters->boot_delay_sec != 0) {
-        start_boot_timer(S2ST((uint32_t)app_info.shared_app_parameters->boot_delay_sec));
+        start_boot_timer(LL_S2ST((uint32_t)app_info.shared_app_parameters->boot_delay_sec));
         return true;
     }
     return false;
