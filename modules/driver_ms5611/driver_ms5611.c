@@ -30,14 +30,14 @@ void ms5611_init(struct ms5611_instance_s* instance, uint8_t spi_idx, uint32_t s
     instance->worker_thread = worker_thread;
 
     // Ensure sufficient power-up time has elapsed
-    chThdSleep(MS2ST(100));
+    chThdSleep(LL_MS2ST(100));
 
     spi_device_init(&instance->spi_dev, spi_idx, select_line, 20000000, 8, SPI_DEVICE_FLAG_CPHA|SPI_DEVICE_FLAG_CPOL);
 
     // Reset device
     ms5611_cmd(instance, MS5611_CMD_RESET);
 
-    chThdSleep(MS2ST(20));
+    chThdSleep(LL_MS2ST(20));
 
     ms5611_read_prom(instance);
 
