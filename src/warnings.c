@@ -1,5 +1,9 @@
 #include <ch.h>
 
+#if __GNUC__ != 6 || __GNUC_MINOR__ != 3 || __GNUC_PATCHLEVEL__ != 1
+#error Please use arm-none-eabi-gcc 6.3.1.
+#endif
+
 #if !CH_DBG_SYSTEM_STATE_CHECK
 #warning Consider enabling CH_DBG_SYSTEM_STATE_CHECK in framework_conf.h.
 #endif
