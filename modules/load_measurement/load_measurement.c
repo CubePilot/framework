@@ -32,7 +32,7 @@ static time_measurement_t cumtime;
 
 RUN_AFTER(WORKER_THREADS_INIT) {
     chTMStartMeasurementX(&cumtime);
-    worker_thread_add_timer_task(&WT, &load_print_task, load_print_task_func, NULL, S2ST(5), true);
+    worker_thread_add_timer_task(&WT, &load_print_task, load_print_task_func, NULL, LL_S2ST(5), true);
 }
 
 static void load_print_task_func(struct worker_thread_timer_task_s* task) {
