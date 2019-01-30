@@ -16,8 +16,10 @@
 #pragma once
 
 #include <stdint.h>
+#include <ch.h>
 
 uint32_t millis(void);
 uint32_t micros(void);
 uint64_t micros64(void);
+uint64_t micros64_from_systime(systime_t systime_now);
 void usleep(uint32_t delay);
