@@ -257,9 +257,10 @@ void worker_thread_takeover(struct worker_thread_s* worker_thread) {
 
             // Perform task
             next_timer_task->task_func(next_timer_task);
-            next_timer_task->timer_begin_systime = tnow_ticks;
 
             if (next_timer_task->auto_repeat) {
+                next_timer_task->timer_begin_systime = tnow_ticks;
+
                 // Re-insert task
                 chSysLock();
                 worker_thread_insert_timer_task_I(worker_thread, next_timer_task);
