@@ -79,8 +79,11 @@ uint8_t pmw3901mb_read(struct pmw3901mb_instance_s* instance, uint8_t reg)
 
 bool pmw3901mb_init(struct pmw3901mb_instance_s* instance, uint8_t spi_idx, uint32_t select_line, enum pmw3901mb_type_t pmw3901mb_type) {
        
-    if (pmw3901mb_type != PMW3901MB_TYPE_V1)
+    if (pmw3901mb_type != PMW3901MB_TYPE_V1) {
         return false;
+    }
+
+    instance->in_frame_capture_mode = false;
 
     spi_device_init(&instance->spi_dev, spi_idx, select_line, 2000, 8, SPI_DEVICE_FLAG_CPHA|SPI_DEVICE_FLAG_CPOL);
     spi_device_set_max_speed_hz(&instance->spi_dev, 2000000);
@@ -95,7 +98,7 @@ bool pmw3901mb_init(struct pmw3901mb_instance_s* instance, uint8_t spi_idx, uint
     pmw3901mb_read(instance, PMW3901MB_DELTA_X_H);
     pmw3901mb_read(instance, PMW3901MB_DELTA_Y_L);
     pmw3901mb_read(instance, PMW3901MB_DELTA_Y_H);
-    
+
     // proprietary optimizations per datasheet
     pmw3901mb_write(instance, 0x7F, 0x00);
     pmw3901mb_write(instance, 0x61, 0xAD);
@@ -139,11 +142,11 @@ bool pmw3901mb_init(struct pmw3901mb_instance_s* instance, uint8_t spi_idx, uint
     pmw3901mb_write(instance, 0x64, 0xFF);
     pmw3901mb_write(instance, 0x65, 0x1F);
     pmw3901mb_write(instance, 0x7F, 0x14);
-    pmw3901mb_write(instance, 0x65, 0x67);  // 0x65, 0x60 in data sheet ??
+    pmw3901mb_write(instance, 0x65, 0x60);  // 0x65, 0x60 in data sheet ??
     pmw3901mb_write(instance, 0x66, 0x08);
-    pmw3901mb_write(instance, 0x63, 0x70);  // 0x63, 0x78
+    pmw3901mb_write(instance, 0x63, 0x78);  // 0x63, 0x78
     pmw3901mb_write(instance, 0x7F, 0x15);
-    pmw3901mb_write(instance, 0x48, 0x48);  // 0x48, 0x58
+    pmw3901mb_write(instance, 0x48, 0x58);  // 0x48, 0x58
     pmw3901mb_write(instance, 0x7F, 0x07);
     pmw3901mb_write(instance, 0x41, 0x0D);
     pmw3901mb_write(instance, 0x43, 0x14);
@@ -156,9 +159,9 @@ bool pmw3901mb_init(struct pmw3901mb_instance_s* instance, uint8_t spi_idx, uint
     pmw3901mb_write(instance, 0x7F, 0x07);
     pmw3901mb_write(instance, 0x40, 0x41);
     pmw3901mb_write(instance, 0x70, 0x00);
-    
+
     chThdSleepMilliseconds(10);
-    
+
     pmw3901mb_write(instance, 0x32, 0x44);
     pmw3901mb_write(instance, 0x7F, 0x07);
     pmw3901mb_write(instance, 0x40, 0x40);
@@ -175,4 +178,67 @@ bool pmw3901mb_init(struct pmw3901mb_instance_s* instance, uint8_t spi_idx, uint
     pmw3901mb_write(instance, 0x40, 0x80);
     
     return true;
+}
+
+void pmw3901mb_frame_capture_start(struct pmw3901mb_instance_s* instance) {
+    if (!instance->in_frame_capture_mode) {
+        instance->in_frame_capture_mode = true;
+        pmw3901mb_write(instance, 0x7F, 0x0E);
+        pmw3901mb_write(instance, 0x70, 0x1D);
+        pmw3901mb_write(instance, 0x71, 0x28);
+        pmw3901mb_write(instance, 0x7F, 0x10);
+        pmw3901mb_write(instance, 0x5B, 0x03);
+        pmw3901mb_write(instance, 0x7F, 0x07);
+        pmw3901mb_write(instance, 0x40, 0x41);
+        pmw3901mb_write(instance, 0x7F, 0x00);
+        chThdSleepMilliseconds(100);
+        pmw3901mb_write(instance, 0x32, 0x00);
+        pmw3901mb_write(instance, 0x7F, 0x07);
+        pmw3901mb_write(instance, 0x40, 0x40);
+        pmw3901mb_write(instance, 0x7F, 0x00);
+        pmw3901mb_write(instance, 0x7F, 0x06);
+        pmw3901mb_write(instance, 0x62, 0x30);
+        pmw3901mb_write(instance, 0x63, 0x00);
+        pmw3901mb_write(instance, 0x7F, 0x07);
+        pmw3901mb_write(instance, 0x41, 0x1D);
+        pmw3901mb_write(instance, 0x4C, 0x00);
+        pmw3901mb_write(instance, 0x7F, 0x08);
+        pmw3901mb_write(instance, 0x6A, 0x38);
+        pmw3901mb_write(instance, 0x7F, 0x00);
+        pmw3901mb_write(instance, 0x55, 0x04);
+        pmw3901mb_write(instance, 0x40, 0x80);
+        pmw3901mb_write(instance, 0x4D, 0x11);
+    } else {
+        pmw3901mb_write(instance, 0x58, 0xff);
+    }
+
+    instance->frame_read_idx = 0;
+    while ((pmw3901mb_read(instance, 0x59) & 0b11000000) != 0b11000000);
+}
+
+size_t pmw3901mb_frame_capture_get_frame_chunk(struct pmw3901mb_instance_s* instance, size_t len, uint8_t* chunk) {
+    if (!instance->in_frame_capture_mode) {
+        return 0;
+    }
+
+    if (instance->frame_read_idx+1+len > 1225) {
+        len = 1225-instance->frame_read_idx;
+    }
+    size_t i = 0;
+    while (i<len) {
+        uint8_t reg_val = pmw3901mb_read(instance, 0x58);
+        if ((reg_val & 0b11000000) >> 6 == 0b10) {
+            chunk[i] = reg_val & 0b00111111;
+        } else if ((reg_val & 0b11000000) >> 6 == 0b01) {
+            chunk[i] |= (reg_val & 0b00001100) << 4;
+            i++;
+            instance->frame_read_idx++;
+        }
+    }
+
+    return len;
+}
+
+bool pmw3901mb_in_frame_capture_mode(struct pmw3901mb_instance_s* instance) {
+    return instance->in_frame_capture_mode;
 }

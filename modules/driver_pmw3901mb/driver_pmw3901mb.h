@@ -10,6 +10,8 @@ enum pmw3901mb_type_t {
 struct pmw3901mb_instance_s {
     struct spi_device_s spi_dev;
     enum pmw3901mb_type_t pmw3901mb_type;
+    uint16_t frame_read_idx;
+    bool in_frame_capture_mode;
 };
 
 struct pmw3901mb_motion_report_s {
@@ -32,3 +34,7 @@ int16_t pmw3901mb_read_dx(struct pmw3901mb_instance_s* instance);
 int16_t pmw3901mb_read_dy(struct pmw3901mb_instance_s* instance);
 void pmw3901mb_write(struct pmw3901mb_instance_s* instance, uint8_t reg, uint8_t value);
 uint8_t pmw3901mb_read(struct pmw3901mb_instance_s* instance, uint8_t reg);
+
+void pmw3901mb_frame_capture_start(struct pmw3901mb_instance_s* instance);
+size_t pmw3901mb_frame_capture_get_frame_chunk(struct pmw3901mb_instance_s* instance, size_t len, uint8_t* chunk);
+bool pmw3901mb_in_frame_capture_mode(struct pmw3901mb_instance_s* instance);
