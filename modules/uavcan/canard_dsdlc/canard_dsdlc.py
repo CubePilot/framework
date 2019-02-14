@@ -71,6 +71,8 @@ if __name__ == '__main__':
                 for field in fields:
                     if field.type.category == field.type.CATEGORY_COMPOUND:
                         new_buildlist.add(field.type.full_name)
+                    elif field.type.category == field.type.CATEGORY_ARRAY and field.type.value_type.category == field.type.CATEGORY_COMPOUND:
+                        new_buildlist.add(field.type.value_type.full_name)
 
             if not new_buildlist-buildlist:
                 break
