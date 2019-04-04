@@ -59,7 +59,8 @@ static uint64_t last_failed_transmit_us64; // set in MASTER, MASTER_INIT, used i
 static uint64_t transmit_init_us64; // adequately protected, no need to initialize
 static uint64_t last_transmit_time_us64; // set in MASTER_INIT, MASTER, used in MASTER - initialize to 0 when transitioning from SLAVE to MASTER
 static uint8_t master_node_id; // used in SLAVE mode - initialize appropriately when transitioning to SLAVE mode
-static int64_t systime_offset; // defined as global_time = micros64()+systime_offset. set in SLAVE mode, used in every mode - never initialize
+static bool have_valid_systime_offset; // set to false in MASTER_INIT, true in MASTER, false in SLAVE until there is a valid sync
+static int64_t systime_offset; // defined as bus_time = micros64()+systime_offset. set in SLAVE mode, used in every mode - never initialize
 static uint64_t prev_received_message_us64; // time of last message from master_node_id - initialize when entering SLAVE mode and when changing master_node_id
 
 PUBSUB_TOPIC_GROUP_CREATE(msg_completion_topic_group, 64)
@@ -101,6 +102,7 @@ static void on_timeout(struct worker_thread_timer_task_s* task) {
         }
     } else if (mode == SLAVE) {
         // transition to MASTER_INIT
+        have_valid_systime_offset = false;
         last_failed_transmit_us64 = 0;
         mode = MASTER_INIT;
     }
@@ -118,6 +120,7 @@ static void timesync_tx_completion_handler(size_t msg_size, const void* buf, voi
             last_transmit_time_us64 = micros64_from_systime(status->completion_systime);
             if (last_failed_transmit_us64 != 0 && tnow_us64-last_failed_transmit_us64 > LL_MS2ST(2200)) {
                 mode = MASTER;
+                have_valid_systime_offset = true;
             }
         } else {
             last_failed_transmit_us64 = tnow_us64;
@@ -128,6 +131,7 @@ static void timesync_tx_completion_handler(size_t msg_size, const void* buf, voi
         } else {
             // transition to MASTER_INIT
             mode = MASTER_INIT;
+            have_valid_systime_offset = false;
             last_failed_transmit_us64 = tnow_us64;
         }
     }
@@ -175,8 +179,10 @@ static void timesync_message_handler(size_t msg_size, const void* buf, void* ctx
             if (prev_received_message_us64 != 0 && msg->previous_transmission_timestamp_usec != 0) {
                 // TODO implement some kind of jitter filter and potentially scale factor estimation
                 systime_offset = prev_received_message_us64-msg->previous_transmission_timestamp_usec;
+                have_valid_systime_offset = true;
 
                 if (self_node_id < master_node_id) {
+                    // transition to MASTER
                     mode = MASTER;
                     last_transmit_time_us64 = 0;
                 }
@@ -185,4 +191,32 @@ static void timesync_message_handler(size_t msg_size, const void* buf, void* ctx
     }
 
     prev_received_message_us64 = micros64_from_systime(msg_wrapper->rx_timestamp);
+}
+
+uint64_t uavcan_timesync_get_bus_time_at_systime(systime_t systime) {
+    if (have_valid_systime_offset) {
+        return micros64_from_systime(systime)+systime_offset;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t uavcan_timesync_get_bus_time_now() {
+    return uavcan_timesync_get_bus_time_at_systime(chVTGetSystemTimeX());
+}
+
+bool uavcan_timesync_micros64_from_bustime(uint64_t bustime, uint64_t* t_us64) {
+    if (!have_valid_systime_offset) {
+        return false;
+    }
+
+    return bustime-systime_offset;
+}
+
+bool uavcan_timesync_get_systime_at_bus_time(uint64_t bustime, systime_t* systime_ret) {
+    if (!have_valid_systime_offset) {
+        return false;
+    }
+
+    *systime_ret = systime_from_micros64(bustime-systime_offset);
 }
