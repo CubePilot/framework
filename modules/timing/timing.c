@@ -56,6 +56,11 @@ uint32_t micros(void) {
     return ((uint32_t)timing_state[idx].update_seconds*1000000) + delta_us;
 }
 
+systime_t systime_from_micros64(uint64_t time_us) {
+    uint8_t idx = timing_state_idx;
+    return (time_us - (timing_state[idx].update_seconds*1000000)) * (CH_CFG_ST_FREQUENCY/1000000) + timing_state[idx].update_systime;
+}
+
 uint64_t micros64_from_systime(systime_t systime_now) {
     uint8_t idx = timing_state_idx;
     int32_t delta_ticks = systime_now-timing_state[idx].update_systime;
