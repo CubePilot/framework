@@ -344,7 +344,7 @@ static void __attribute__((optimize("O3"))) uavcan_transmit_chunk_handler(uint8_
     }
 }
 
-static bool _uavcan_send(struct uavcan_instance_s* instance, const struct uavcan_message_descriptor_s* const msg_descriptor, uint16_t data_type_id, uint8_t priority, uint8_t transfer_id, uint8_t dest_node_id, void* msg_data) {
+static bool _uavcan_send(struct uavcan_instance_s* instance, const struct uavcan_message_descriptor_s* const msg_descriptor, uint16_t data_type_id, uint8_t priority, uint8_t transfer_id, uint8_t dest_node_id, void* msg_data, systime_t timeout, struct pubsub_topic_s* completion_topic) {
     if (!instance || !msg_descriptor || !msg_descriptor->serializer_func || !msg_data) {
         return false;
     }
@@ -426,12 +426,12 @@ static bool _uavcan_send(struct uavcan_instance_s* instance, const struct uavcan
         memcpy(tx_state.frame_list_head->content.data, &crc16, 2);
     }
 
-    can_enqueue_tx_frames(instance->can_instance, &tx_state.frame_list_head, TIME_INFINITE, NULL);
+    can_enqueue_tx_frames(instance->can_instance, &tx_state.frame_list_head, timeout, completion_topic);
 
     return true;
 }
 
-bool uavcan_broadcast(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, void* msg_data) {
+bool uavcan_broadcast_with_callback(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, void* msg_data, systime_t timeout, struct pubsub_topic_s* completion_topic) {
     struct uavcan_instance_s* instance = uavcan_get_instance(uavcan_idx);
     if (!instance) {
         return false;
@@ -441,12 +441,16 @@ bool uavcan_broadcast(uint8_t uavcan_idx, const struct uavcan_message_descriptor
     chSysLock();
     uint8_t* transfer_id = uavcan_transfer_id_map_retrieve(&instance->transfer_id_map, false, data_type_id, 0);
     chSysUnlock();
-    if(_uavcan_send(instance, msg_descriptor, data_type_id, priority, *transfer_id, 0, msg_data)) {
+    if(_uavcan_send(instance, msg_descriptor, data_type_id, priority, *transfer_id, 0, msg_data, timeout, completion_topic)) {
         (*transfer_id)++;
         return true;
     } else {
         return false;
     }
+}
+
+bool uavcan_broadcast(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, void* msg_data) {
+    return uavcan_broadcast_with_callback(uavcan_idx, msg_descriptor, priority, msg_data, LL_S2ST(2), NULL);
 }
 
 bool uavcan_request(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, uint8_t dest_node_id, void* msg_data) {
@@ -459,7 +463,7 @@ bool uavcan_request(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s
     chSysLock();
     uint8_t* transfer_id = uavcan_transfer_id_map_retrieve(&instance->transfer_id_map, false, data_type_id, 0);
     chSysUnlock();
-    if(_uavcan_send(instance, msg_descriptor, data_type_id, priority, *transfer_id, dest_node_id, msg_data)) {
+    if(_uavcan_send(instance, msg_descriptor, data_type_id, priority, *transfer_id, dest_node_id, msg_data, LL_S2ST(2), NULL)) {
         (*transfer_id)++;
         return true;
     } else {
@@ -478,7 +482,7 @@ bool uavcan_respond(uint8_t uavcan_idx, const struct uavcan_deserialized_message
     uint8_t transfer_id = req_msg->transfer_id;
     uint8_t dest_node_id = req_msg->source_node_id;
     uint16_t data_type_id = msg_descriptor->default_data_type_id;
-    return _uavcan_send(instance, msg_descriptor, data_type_id, priority, transfer_id, dest_node_id, msg_data);
+    return _uavcan_send(instance, msg_descriptor, data_type_id, priority, transfer_id, dest_node_id, msg_data, LL_S2ST(2), NULL);
 }
 
 static void uavcan_can_rx_handler(size_t msg_size, const void* msg, void* ctx) {
@@ -489,7 +493,7 @@ static void uavcan_can_rx_handler(size_t msg_size, const void* msg, void* ctx) {
 
     CanardCANFrame canard_frame = convert_can_frame_to_CanardCANFrame(&frame->content);
 
-    uint64_t timestamp = micros64();
+    uint64_t timestamp = micros64_from_systime(frame->rx_systime);
     canardHandleRxFrame(&instance->canard, &canard_frame, timestamp);
 }
 
@@ -568,6 +572,7 @@ static void uavcan_message_writer_func(size_t msg_size, void* write_buf, void* c
     deserialized_message->data_type_id = args->transfer->data_type_id;
     deserialized_message->transfer_id = args->transfer->transfer_id;
     deserialized_message->priority = args->transfer->priority;
+    deserialized_message->rx_timestamp = systime_from_micros64(args->transfer->timestamp_usec);
     deserialized_message->source_node_id = args->transfer->source_node_id;
     args->descriptor->deserializer_func(args->transfer, deserialized_message->msg);
 }
