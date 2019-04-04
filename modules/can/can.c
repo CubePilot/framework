@@ -329,7 +329,7 @@ struct can_instance_s* can_driver_register(uint8_t can_idx, void* driver_ctx, co
     pubsub_init_topic(&instance->rx_topic, NULL); // TODO specific/configurable topic group
     worker_thread_add_publisher_task(&WT_TRX, &instance->rx_publisher_task, sizeof(struct can_rx_frame_s), num_rx_mailboxes*rx_fifo_depth);
 
-    worker_thread_add_publisher_task(&WT_TRX, &instance->tx_publisher_task, sizeof(struct can_transmit_completion_msg_s), num_tx_mailboxes);
+    worker_thread_add_publisher_task(&WT_TRX, &instance->tx_publisher_task, sizeof(struct can_transmit_completion_msg_s), num_tx_mailboxes*4);
 
     worker_thread_add_timer_task(&WT_EXPIRE, &instance->expire_timer_task, can_expire_handler, instance, TIME_INFINITE, false);
 
@@ -417,7 +417,7 @@ static void can_tx_frame_completed_I(struct can_instance_s* instance, struct can
     chDbgCheckClassI();
 
     if (frame->completion_topic) {
-        struct can_transmit_completion_msg_s msg = { success, completion_systime };
+        struct can_transmit_completion_msg_s msg = { completion_systime, success };
         worker_thread_publisher_task_publish_I(&instance->tx_publisher_task, frame->completion_topic, sizeof(struct can_transmit_completion_msg_s), pubsub_copy_writer_func, &msg);
     }
     chPoolFreeI(&instance->frame_pool, frame);
@@ -425,7 +425,7 @@ static void can_tx_frame_completed_I(struct can_instance_s* instance, struct can
 
 static void can_tx_frame_completed(struct can_instance_s* instance, struct can_tx_frame_s* frame, bool success, systime_t completion_systime) {
     if (frame->completion_topic) {
-        struct can_transmit_completion_msg_s msg = { success, completion_systime };
+        struct can_transmit_completion_msg_s msg = { completion_systime, success };
         pubsub_publish_message(frame->completion_topic, sizeof(struct can_transmit_completion_msg_s), pubsub_copy_writer_func, &msg);
     }
     chPoolFree(&instance->frame_pool, frame);
