@@ -2,7 +2,7 @@
 
 #include <ch.h>
 #include <hal.h>
-#ifdef STM32F4xx_MCUCONF
+#if defined(STM32F4) || defined(STM32F7)
 
 // #pragma GCC optimize("O0")
 
@@ -22,30 +22,37 @@ typedef uint16_t flash_word_t;
 #define STM32_FLASH_BASE    0x08000000
 #define STM32_FLASH_SIZE    KB(BOARD_FLASH_SIZE)
 
-// optionally disable interrupts during flash writes
-#define STM32_FLASH_DISABLE_ISR 0
-
 // the 2nd bank of flash needs to be handled differently
 #define STM32_FLASH_BANK2_START (STM32_FLASH_BASE+0x00080000)
 
-
-#if BOARD_FLASH_SIZE == 512
+#if defined(STM32F4) && BOARD_FLASH_SIZE == 512
 #define STM32_FLASH_NPAGES  7
-static const uint32_t flash_memmap[STM32_FLASH_NPAGES] = { KB(16), KB(16), KB(16), KB(16), KB(64),
-                                                           KB(128), KB(128), KB(128) };
-
-#elif BOARD_FLASH_SIZE == 1024
+static const uint32_t flash_memmap[STM32_FLASH_NPAGES] = {
+    KB(16), KB(16), KB(16), KB(16), KB(64),
+    KB(128), KB(128), KB(128)
+};
+#elif defined(STM32F4) && BOARD_FLASH_SIZE == 1024
 #define STM32_FLASH_NPAGES  12
-static const uint32_t flash_memmap[STM32_FLASH_NPAGES] = { KB(16), KB(16), KB(16), KB(16), KB(64),
-                                                           KB(128), KB(128), KB(128), KB(128), KB(128), KB(128), KB(128) };
-
-#elif BOARD_FLASH_SIZE == 2048
+static const uint32_t flash_memmap[STM32_FLASH_NPAGES] = {
+    KB(16), KB(16), KB(16), KB(16), KB(64),
+    KB(128), KB(128), KB(128), KB(128), KB(128), KB(128), KB(128)
+};
+#elif defined(STM32F4) && BOARD_FLASH_SIZE == 2048
 #define STM32_FLASH_NPAGES  24
-static const uint32_t flash_memmap[STM32_FLASH_NPAGES] = { KB(16), KB(16), KB(16), KB(16), KB(64),
-                                                           KB(128), KB(128), KB(128), KB(128), KB(128), KB(128), KB(128),
-                                                           KB(16), KB(16), KB(16), KB(16), KB(64),
-                                                           KB(128), KB(128), KB(128), KB(128), KB(128), KB(128), KB(128)};
+static const uint32_t flash_memmap[STM32_FLASH_NPAGES] = {
+    KB(16), KB(16), KB(16), KB(16), KB(64),
+    KB(128), KB(128), KB(128), KB(128), KB(128), KB(128), KB(128),
+    KB(16), KB(16), KB(16), KB(16), KB(64),
+    KB(128), KB(128), KB(128), KB(128), KB(128), KB(128), KB(128)
+};
+#elif defined(STM32F7) && BOARD_FLASH_SIZE == 2048
+#define STM32_FLASH_NPAGES  12
+static const uint32_t flash_memmap[STM32_FLASH_NPAGES] = {
+    KB(32), KB(32), KB(32), KB(32), KB(128),
+    KB(256), KB(256), KB(256), KB(256), KB(256), KB(256), KB(256)
+};
 #endif
+
 
 // keep a cache of the page addresses
 static uint32_t flash_pageaddr[STM32_FLASH_NPAGES];
@@ -77,6 +84,7 @@ static inline void putreg16(uint16_t val, unsigned int addr)
 static void stm32_flash_wait_idle(void)
 {
 	while (FLASH->SR & FLASH_SR_BSY) {
+        __asm__("nop");
         // nop
     }
 }
@@ -92,7 +100,9 @@ static void stm32_flash_unlock(void)
     }
 
     // disable the data cache - see stm32 errata 2.1.11
+#ifdef FLASH_ACR_DCEN
     FLASH->ACR &= ~FLASH_ACR_DCEN;
+#endif
 }
 
 void stm32_flash_lock(void)
@@ -101,9 +111,11 @@ void stm32_flash_lock(void)
     FLASH->CR |= FLASH_CR_LOCK;
 
     // reset and re-enable the data cache - see stm32 errata 2.1.11
+#ifdef FLASH_ACR_DCEN
     FLASH->ACR |= FLASH_ACR_DCRST;
     FLASH->ACR &= ~FLASH_ACR_DCRST;
     FLASH->ACR |= FLASH_ACR_DCEN;
+#endif
 }
 
 /*
@@ -227,13 +239,13 @@ bool flash_write(void* address, volatile uint8_t num_bufs, struct flash_write_bu
     if (!(RCC->CR & RCC_CR_HSION)) {
         return false;
     }
+
     stm32_flash_unlock();
 
     // clear previous errors
     FLASH->SR = 0xF3;
 
-    FLASH->CR &= ~(FLASH_CR_PSIZE);
-    FLASH->CR |= FLASH_CR_PSIZE_0 | FLASH_CR_PG;
+    FLASH->CR = FLASH_CR_PSIZE_0;
 
     bool success = true;
     flash_word_t* target_word_ptr = address;
@@ -264,8 +276,9 @@ bool flash_write(void* address, volatile uint8_t num_bufs, struct flash_write_bu
             }
         }
 
+        FLASH->CR |= FLASH_CR_PG;
         putreg16(source_word.word_value, (unsigned int)target_word_ptr);
-
+        __DSB();
         stm32_flash_wait_idle();
 
         if (FLASH->SR) {
@@ -291,4 +304,4 @@ failed:
     return success;
 }
 
-#endif //STM32F4xx_MCUCONF
+#endif // defined(STM32F4) || defined(STM32F7)

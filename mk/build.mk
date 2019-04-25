@@ -110,16 +110,22 @@ COMMON_INC := $(FRAMEWORK_DIR)/include
 
 ifneq ($(findstring stm32,$(TGT_MCU)),)
   RULESPATH = $(FRAMEWORK_DIR)/platforms/ARMCMx
-  MCU  = cortex-m4
   TRGT = arm-none-eabi-
   UDEFS += -DARCH_LITTLE_ENDIAN
   ifneq ($(findstring stm32f3,$(TGT_MCU)),)
     include $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC/mk/startup_stm32f3xx.mk
     include $(CHIBIOS)/os/hal/ports/STM32/STM32F3xx/platform.mk
+    MCU  = cortex-m4
   endif
   ifneq ($(findstring stm32f4,$(TGT_MCU)),)
     include $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC/mk/startup_stm32f4xx.mk
     include $(CHIBIOS)/os/hal/ports/STM32/STM32F4xx/platform.mk
+    MCU  = cortex-m4
+  endif
+  ifneq ($(findstring stm32f7,$(TGT_MCU)),)
+    include $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC/mk/startup_stm32f7xx.mk
+    include $(CHIBIOS)/os/hal/ports/STM32/STM32F7xx/platform.mk
+    MCU  = cortex-m7
   endif
   include $(CHIBIOS)/os/common/ports/ARMCMx/compilers/GCC/mk/port_v7m.mk
 endif
