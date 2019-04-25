@@ -140,18 +140,22 @@ static SPIConfig spi_make_config(struct spi_device_s* dev) {
 }
 
 static void spi_device_assert_chip_select(struct spi_device_s* dev) {
-    if (FLAG_BIT_VAL(dev->flags,SPI_DEVICE_FLAG_SELPOL)) {
-        palSetLine(dev->sel_line);
-    } else {
-        palClearLine(dev->sel_line);
+    if (dev->sel_line != 0) {
+        if (FLAG_BIT_VAL(dev->flags,SPI_DEVICE_FLAG_SELPOL)) {
+            palSetLine(dev->sel_line);
+        } else {
+            palClearLine(dev->sel_line);
+        }
     }
 }
 
 static void spi_device_deassert_chip_select(struct spi_device_s* dev) {
-    if (FLAG_BIT_VAL(dev->flags,SPI_DEVICE_FLAG_SELPOL)) {
-        palClearLine(dev->sel_line);
-    } else {
-        palSetLine(dev->sel_line);
+    if (dev->sel_line != 0) {
+        if (FLAG_BIT_VAL(dev->flags,SPI_DEVICE_FLAG_SELPOL)) {
+            palClearLine(dev->sel_line);
+        } else {
+            palSetLine(dev->sel_line);
+        }
     }
 }
 
