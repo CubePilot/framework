@@ -1,6 +1,6 @@
 #include <ch.h>
 #include <string.h>
-#include "profiLED.h"
+#include "driver_profiLED.h"
 #include <common/helpers.h>
 #include <app_config.h>
 
