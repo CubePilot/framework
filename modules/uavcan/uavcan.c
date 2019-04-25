@@ -5,7 +5,10 @@
 #include <string.h>
 #include <modules/can/can.h>
 #include <modules/worker_thread/worker_thread.h>
+
+#ifndef TARGET_BOOTLOADER
 #include <app_config.h>
+#endif
 
 #ifdef MODULE_BOOT_MSG_ENABLED
 #include <modules/boot_msg/boot_msg.h>
@@ -93,11 +96,12 @@ static struct worker_thread_timer_task_s stale_transfer_cleanup_task;
 
 static struct uavcan_instance_s* uavcan_instance_list_head;
 
-#ifdef MODULE_PARAM_ENABLED
-#include <modules/param/param.h>
 #ifndef APP_CONFIG_CAN_LOCAL_NODE_ID
 #define APP_CONFIG_CAN_LOCAL_NODE_ID 0
 #endif
+
+#ifdef MODULE_PARAM_ENABLED
+#include <modules/param/param.h>
 PARAM_DEFINE_UINT8_PARAM_STATIC(node_id_param, "uavcan.node_id", APP_CONFIG_CAN_LOCAL_NODE_ID, 0, 125)
 #endif
 
@@ -130,7 +134,7 @@ static void uavcan_init(uint8_t can_dev_idx) {
 
     instance->idx = uavcan_get_idx(instance);
 
-    uint8_t node_id = 0;
+    uint8_t node_id = APP_CONFIG_CAN_LOCAL_NODE_ID;
 
 #ifdef MODULE_APP_DESCRIPTOR_ENABLED
     {
