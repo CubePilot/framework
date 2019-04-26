@@ -27,7 +27,7 @@ struct pmw3901mb_motion_report_s {
     uint8_t shutter_lower;
 };
 
-bool pmw3901mb_init(struct pmw3901mb_instance_s* instance, uint8_t spi_idx, uint32_t select_line, enum pmw3901mb_type_t pmw3901mb_type);
+bool pmw3901mb_init(struct pmw3901mb_instance_s* instance, SPIDriver* spi_driver, uint32_t select_line, enum pmw3901mb_type_t pmw3901mb_type);
 bool pmw3901mb_burst_read(struct pmw3901mb_instance_s* instance, struct pmw3901mb_motion_report_s* ret);
 bool pmw3901mb_motion_detected(struct pmw3901mb_instance_s* instance);
 int16_t pmw3901mb_read_dx(struct pmw3901mb_instance_s* instance);

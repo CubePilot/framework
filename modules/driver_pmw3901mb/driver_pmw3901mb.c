@@ -77,7 +77,7 @@ uint8_t pmw3901mb_read(struct pmw3901mb_instance_s* instance, uint8_t reg)
     return value;
 }
 
-bool pmw3901mb_init(struct pmw3901mb_instance_s* instance, uint8_t spi_idx, uint32_t select_line, enum pmw3901mb_type_t pmw3901mb_type) {
+bool pmw3901mb_init(struct pmw3901mb_instance_s* instance, SPIDriver* spi_driver, uint32_t select_line, enum pmw3901mb_type_t pmw3901mb_type) {
        
     if (pmw3901mb_type != PMW3901MB_TYPE_V1) {
         return false;
@@ -85,7 +85,7 @@ bool pmw3901mb_init(struct pmw3901mb_instance_s* instance, uint8_t spi_idx, uint
 
     instance->in_frame_capture_mode = false;
 
-    spi_device_init(&instance->spi_dev, spi_idx, select_line, 2000, 8, SPI_DEVICE_FLAG_CPHA|SPI_DEVICE_FLAG_CPOL);
+    spi_device_init(&instance->spi_dev, spi_driver, select_line, 2000, 8, SPI_DEVICE_FLAG_CPHA|SPI_DEVICE_FLAG_CPOL);
     spi_device_set_max_speed_hz(&instance->spi_dev, 2000000);
 
     chThdSleepMilliseconds(PMW3901MB_WAKEUP_MS);

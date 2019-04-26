@@ -118,7 +118,7 @@ struct dw1000_instance_s {
 };
 
 int64_t dw1000_wrap_timestamp(int64_t ts);
-void dw1000_init(struct dw1000_instance_s* instance, uint8_t spi_idx, uint32_t select_line, uint32_t reset_line);
+void dw1000_init(struct dw1000_instance_s* instance, SPIDriver* spi_driver, uint32_t select_line, uint32_t reset_line);
 struct dw1000_rx_frame_info_s dw1000_receive(struct dw1000_instance_s* instance, uint32_t buf_len, void* buf);
 struct dw1000_rx_frame_info_s dw1000_receive_data_only(struct dw1000_instance_s* instance, uint32_t buf_len, void* buf);
 void dw1000_transmit(struct dw1000_instance_s* instance, uint32_t buf_len, void* buf, bool expect_response);

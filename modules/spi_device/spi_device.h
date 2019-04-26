@@ -12,16 +12,16 @@
 struct spi_device_s {
     uint32_t max_speed_hz;
     uint32_t sel_line;
-    uint8_t bus_idx;
     uint8_t data_size;
     uint8_t flags;
     bool bus_acquired;
 
+    SPIDriver* spi_driver;
     SPIConfig spiconf;
 };
 
 
-bool spi_device_init(struct spi_device_s* dev, uint8_t bus_idx, uint32_t sel_line, uint32_t max_speed_hz, uint8_t data_size, uint8_t flags);
+bool spi_device_init(struct spi_device_s* dev, SPIDriver* spi_driver, uint32_t sel_line, uint32_t max_speed_hz, uint8_t data_size, uint8_t flags);
 void spi_device_set_max_speed_hz(struct spi_device_s* dev, uint32_t max_speed_hz);
 void spi_device_begin(struct spi_device_s* dev);
 void spi_device_send(struct spi_device_s* dev, uint32_t n, const void* txbuf);

@@ -11,13 +11,13 @@
 
 static uint8_t icm20x48_get_whoami(enum icm20x48_imu_type_t imu_type);
 
-bool icm20x48_init(struct icm20x48_instance_s* instance, uint8_t spi_idx, uint32_t select_line, enum icm20x48_imu_type_t imu_type) {
+bool icm20x48_init(struct icm20x48_instance_s* instance, SPIDriver* spi_driver, uint32_t select_line, enum icm20x48_imu_type_t imu_type) {
     // Ensure sufficient power-up time has elapsed
     chThdSleep(LL_MS2ST(100));
 
     instance->curr_bank = 99;
 
-    spi_device_init(&instance->spi_dev, spi_idx, select_line, 7000000, 16, SPI_DEVICE_FLAG_CPHA|SPI_DEVICE_FLAG_CPOL);
+    spi_device_init(&instance->spi_dev, spi_driver, select_line, 7000000, 16, SPI_DEVICE_FLAG_CPHA|SPI_DEVICE_FLAG_CPOL);
 
     if (icm20x48_read_reg(instance, ICM20948_REG_WHO_AM_I) != icm20x48_get_whoami(imu_type)) {
         return false;

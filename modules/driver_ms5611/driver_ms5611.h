@@ -42,4 +42,4 @@ struct ms5611_sample_s {
     float temperature_K;
 };
 
-void ms5611_init(struct ms5611_instance_s* instance, uint8_t spi_idx, uint32_t select_line, struct worker_thread_s* worker_thread, struct pubsub_topic_s* topic);
+void ms5611_init(struct ms5611_instance_s* instance, SPIDriver* spi_driver, uint32_t select_line, struct worker_thread_s* worker_thread, struct pubsub_topic_s* topic);

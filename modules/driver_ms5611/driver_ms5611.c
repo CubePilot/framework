@@ -25,14 +25,14 @@ static void ms5611_cmd(struct ms5611_instance_s* instance, uint8_t cmd);
 static void ms5611_read(struct ms5611_instance_s* instance, uint8_t addr, uint8_t n, uint8_t* buf);
 static bool crc4(uint16_t *prom);
 
-void ms5611_init(struct ms5611_instance_s* instance, uint8_t spi_idx, uint32_t select_line, struct worker_thread_s* worker_thread, struct pubsub_topic_s* topic) {
+void ms5611_init(struct ms5611_instance_s* instance, SPIDriver* spi_driver, uint32_t select_line, struct worker_thread_s* worker_thread, struct pubsub_topic_s* topic) {
     instance->topic = topic;
     instance->worker_thread = worker_thread;
 
     // Ensure sufficient power-up time has elapsed
     chThdSleep(LL_MS2ST(100));
 
-    spi_device_init(&instance->spi_dev, spi_idx, select_line, 20000000, 8, SPI_DEVICE_FLAG_CPHA|SPI_DEVICE_FLAG_CPOL);
+    spi_device_init(&instance->spi_dev, spi_driver, select_line, 20000000, 8, SPI_DEVICE_FLAG_CPHA|SPI_DEVICE_FLAG_CPOL);
 
     // Reset device
     ms5611_cmd(instance, MS5611_CMD_RESET);

@@ -16,7 +16,7 @@ typedef struct profiLED_color_s (*profiLED_color_func)(uint32_t led_idx, void* c
 void profiLED_output(uint32_t sclk_line, uint32_t mosi_line, uint32_t num_leds, profiLED_color_func color_func, void* ctx);
 
 #ifdef MODULE_SPI_DEVICE_ENABLED
-bool profiLED_spi_dev_init(struct spi_device_s* dev, uint8_t spi_bus_idx, uint32_t spi_sel_line, bool sel_active_high, uint32_t speed_hz);
+bool profiLED_spi_dev_init(struct spi_device_s* dev, SPIDriver* spi_driver, uint32_t spi_sel_line, bool sel_active_high, uint32_t speed_hz);
 void profiLED_output_spi(struct spi_device_s* dev, uint32_t num_leds, profiLED_color_func color_func, void* ctx);
 #endif
 

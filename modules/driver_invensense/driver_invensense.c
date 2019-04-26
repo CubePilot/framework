@@ -16,11 +16,11 @@ static void invensense_read(struct invensense_instance_s* instance, uint8_t reg,
 static void invensense_write(struct invensense_instance_s* instance, uint8_t reg, size_t len, void* buf);
 static uint8_t invensense_get_whoami(enum invensense_imu_type_t imu_type);
 
-bool invensense_init(struct invensense_instance_s* instance, uint8_t spi_idx, uint32_t select_line, enum invensense_imu_type_t imu_type) {
+bool invensense_init(struct invensense_instance_s* instance, SPIDriver* spi_driver, uint32_t select_line, enum invensense_imu_type_t imu_type) {
     // Ensure sufficient power-up time has elapsed
     chThdSleep(LL_MS2ST(100));
 
-    spi_device_init(&instance->spi_dev, spi_idx, select_line, 10000, 8, SPI_DEVICE_FLAG_CPHA|SPI_DEVICE_FLAG_CPOL);
+    spi_device_init(&instance->spi_dev, spi_driver, select_line, 10000, 8, SPI_DEVICE_FLAG_CPHA|SPI_DEVICE_FLAG_CPOL);
 
     if (invensense_read8(instance, INVENSENSE_REG_WHO_AM_I) != invensense_get_whoami(imu_type)) {
         return false;

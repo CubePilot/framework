@@ -53,8 +53,8 @@ void profiLED_output_gpio(uint32_t sclk_line, uint32_t mosi_line, uint32_t num_l
 }
 
 #ifdef MODULE_SPI_DEVICE_ENABLED
-bool profiLED_spi_dev_init(struct spi_device_s* dev, uint8_t spi_bus_idx, uint32_t spi_sel_line, bool sel_active_high, uint32_t speed_hz) {
-    return spi_device_init(dev, spi_bus_idx, spi_sel_line, speed_hz, 8, (sel_active_high?SPI_DEVICE_FLAG_SELPOL:0));
+bool profiLED_spi_dev_init(struct spi_device_s* dev, SPIDriver* spi_driver, uint32_t spi_sel_line, bool sel_active_high, uint32_t speed_hz) {
+    return spi_device_init(dev, spi_driver, spi_sel_line, speed_hz, 8, (sel_active_high?SPI_DEVICE_FLAG_SELPOL:0));
 }
 
 void profiLED_output_spi(struct spi_device_s* dev, uint32_t num_leds, profiLED_color_func color_func, void* ctx) {

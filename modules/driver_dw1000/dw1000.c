@@ -45,7 +45,7 @@ int64_t dw1000_wrap_timestamp(int64_t ts) {
     return ts & (((uint64_t)1<<40)-1);
 }
 
-void dw1000_init(struct dw1000_instance_s* instance, uint8_t spi_idx, uint32_t select_line, uint32_t reset_line) {
+void dw1000_init(struct dw1000_instance_s* instance, SPIDriver* spi_driver, uint32_t select_line, uint32_t reset_line) {
     if (!instance) {
         return;
     }
@@ -59,7 +59,7 @@ void dw1000_init(struct dw1000_instance_s* instance, uint8_t spi_idx, uint32_t s
 
     // This is handled by sleeping inside of dw1000_hard_reset
 
-    spi_device_init(&instance->spi_dev, spi_idx, select_line, 3000000, 8, 0);
+    spi_device_init(&instance->spi_dev, spi_driver, select_line, 3000000, 8, 0);
     instance->reset_line = reset_line;
     instance->config.prf = DW1000_PRF_64MHZ;
     instance->config.preamble = DW1000_PREAMBLE_128;
