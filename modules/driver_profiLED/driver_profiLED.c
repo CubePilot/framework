@@ -4,12 +4,6 @@
 #include <common/helpers.h>
 #include <app_config.h>
 
-#ifndef MAX_NUM_PROFILEDS
-#define MAX_NUM_PROFILEDS 64
-#endif
-
-#define PROFILED_OUTPUT_BUFFER_SIZE PROFILED_GEN_BUF_SIZE(MAX_NUM_PROFILEDS)
-
 static void _profiled_update(struct profiLED_instance_s* instance);
 
 void profiLED_init(struct profiLED_instance_s* instance, uint8_t spi_bus_idx, uint32_t spi_sel_line, bool sel_active_high, uint32_t num_leds) {
@@ -57,7 +51,7 @@ static void _profiled_update(struct profiLED_instance_s* instance) {
         return;
     }
 
-    uint8_t txbuf[PROFILED_OUTPUT_BUFFER_SIZE];
+    uint8_t txbuf[PROFILED_GEN_BUF_SIZE(instance->num_leds)];
     uint32_t buf_len = profiLED_gen_write_buf(instance->num_leds, instance->colors, txbuf, sizeof(txbuf));
     if (buf_len == 0) {
         return;
