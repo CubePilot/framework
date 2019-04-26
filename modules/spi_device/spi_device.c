@@ -25,6 +25,10 @@ bool spi_device_init(struct spi_device_s* dev, uint8_t bus_idx, uint32_t sel_lin
 
     spi_device_deassert_chip_select(dev);
 
+    if (sel_line == 0) {
+        spi_device_begin(dev);
+    }
+
     return true;
 }
 
