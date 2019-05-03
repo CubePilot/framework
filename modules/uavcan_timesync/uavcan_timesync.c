@@ -178,7 +178,8 @@ static void timesync_message_handler(size_t msg_size, const void* buf, void* ctx
             // compute time offset
             if (prev_received_message_us64 != 0 && msg->previous_transmission_timestamp_usec != 0) {
                 // TODO implement some kind of jitter filter and potentially scale factor estimation
-                systime_offset = prev_received_message_us64-msg->previous_transmission_timestamp_usec;
+                systime_offset = msg->previous_transmission_timestamp_usec - prev_received_message_us64;
+
                 have_valid_systime_offset = true;
 
                 if (self_node_id < master_node_id) {
@@ -201,16 +202,8 @@ uint64_t uavcan_timesync_get_bus_time_at_systime(systime_t systime) {
     }
 }
 
-uint64_t uavcan_timesync_get_bus_time_now() {
+uint64_t uavcan_timesync_get_bus_time_now(void) {
     return uavcan_timesync_get_bus_time_at_systime(chVTGetSystemTimeX());
-}
-
-bool uavcan_timesync_micros64_from_bustime(uint64_t bustime, uint64_t* t_us64) {
-    if (!have_valid_systime_offset) {
-        return false;
-    }
-
-    return bustime-systime_offset;
 }
 
 bool uavcan_timesync_get_systime_at_bus_time(uint64_t bustime, systime_t* systime_ret) {
@@ -219,4 +212,5 @@ bool uavcan_timesync_get_systime_at_bus_time(uint64_t bustime, systime_t* systim
     }
 
     *systime_ret = systime_from_micros64(bustime-systime_offset);
+    return true;
 }
