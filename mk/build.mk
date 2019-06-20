@@ -60,13 +60,13 @@ endif
 
 CHIBIOS ?= $(FRAMEWORK_DIR)/ChibiOS
 
-ifeq ($(PROJECT),)
-  PROJECT = $(notdir $(shell pwd))
-endif
-
 override BOARD_DIR := $(realpath $(BOARD_DIR))
 
 BOARD := $(lastword $(subst /, ,$(BOARD_DIR)))
+
+ifeq ($(PROJECT),)
+  PROJECT = $(notdir $(shell pwd))_$(BOARD)
+endif
 
 include $(BOARD_DIR)/board.mk
 
