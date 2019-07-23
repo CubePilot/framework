@@ -77,28 +77,113 @@ uint8_t pmw3901mb_read(struct pmw3901mb_instance_s* instance, uint8_t reg)
     return value;
 }
 
-bool pmw3901mb_init(struct pmw3901mb_instance_s* instance, uint8_t spi_idx, uint32_t select_line, enum pmw3901mb_type_t pmw3901mb_type) {
-       
-    if (pmw3901mb_type != PMW3901MB_TYPE_V1) {
-        return false;
-    }
+static void pmw3901mb_conf_3903_bright(struct pmw3901mb_instance_s* instance) {
+    pmw3901mb_write(instance, 0x7F, 0x00);
+    pmw3901mb_write(instance, 0x55, 0x01);
+    pmw3901mb_write(instance, 0x50, 0x07);
+    pmw3901mb_write(instance, 0x7f, 0x0e);
+    pmw3901mb_write(instance, 0x43, 0x10);
+    pmw3901mb_write(instance, 0x48, 0x02);
+    pmw3901mb_write(instance, 0x7F, 0x00);
+    pmw3901mb_write(instance, 0x51, 0x7b);
+    pmw3901mb_write(instance, 0x50, 0x00);
+    pmw3901mb_write(instance, 0x55, 0x00);
+    pmw3901mb_write(instance, 0x7F, 0x00);
+    pmw3901mb_write(instance, 0x61, 0xAD);
+    pmw3901mb_write(instance, 0x7F, 0x03);
+    pmw3901mb_write(instance, 0x40, 0x00);
+    pmw3901mb_write(instance, 0x7F, 0x05);
+    pmw3901mb_write(instance, 0x41, 0xB3);
+    pmw3901mb_write(instance, 0x43, 0xF1);
+    pmw3901mb_write(instance, 0x45, 0x14);
+    pmw3901mb_write(instance, 0x5F, 0x34);
+    pmw3901mb_write(instance, 0x7B, 0x08);
+    pmw3901mb_write(instance, 0x5e, 0x34);
+    pmw3901mb_write(instance, 0x5b, 0x32);
+    pmw3901mb_write(instance, 0x6d, 0x32);
+    pmw3901mb_write(instance, 0x45, 0x17);
+    pmw3901mb_write(instance, 0x70, 0xe5);
+    pmw3901mb_write(instance, 0x71, 0xe5);
+    pmw3901mb_write(instance, 0x7F, 0x06);
+    pmw3901mb_write(instance, 0x44, 0x1B);
+    pmw3901mb_write(instance, 0x40, 0xBF);
+    pmw3901mb_write(instance, 0x4E, 0x3F);
+    pmw3901mb_write(instance, 0x7F, 0x08);
+    pmw3901mb_write(instance, 0x66, 0x44);
+    pmw3901mb_write(instance, 0x65, 0x20);
+    pmw3901mb_write(instance, 0x6a, 0x3a);
+    pmw3901mb_write(instance, 0x61, 0x05);
+    pmw3901mb_write(instance, 0x62, 0x05);
+    pmw3901mb_write(instance, 0x7F, 0x09);
+    pmw3901mb_write(instance, 0x4F, 0xAF);
+    pmw3901mb_write(instance, 0x48, 0x80);
+    pmw3901mb_write(instance, 0x49, 0x80);
+    pmw3901mb_write(instance, 0x57, 0x77);
+    pmw3901mb_write(instance, 0x5F, 0x40);
+    pmw3901mb_write(instance, 0x60, 0x78);
+    pmw3901mb_write(instance, 0x61, 0x78);
+    pmw3901mb_write(instance, 0x62, 0x08);
+    pmw3901mb_write(instance, 0x63, 0x50);
+    pmw3901mb_write(instance, 0x7F, 0x0A);
+    pmw3901mb_write(instance, 0x45, 0x60);
+    pmw3901mb_write(instance, 0x7F, 0x00);
+    pmw3901mb_write(instance, 0x4D, 0x11);
+    pmw3901mb_write(instance, 0x55, 0x80);
+    pmw3901mb_write(instance, 0x74, 0x21);
+    pmw3901mb_write(instance, 0x75, 0x1F);
+    pmw3901mb_write(instance, 0x4A, 0x78);
+    pmw3901mb_write(instance, 0x4B, 0x78);
+    pmw3901mb_write(instance, 0x44, 0x08);
+    pmw3901mb_write(instance, 0x45, 0x50);
+    pmw3901mb_write(instance, 0x64, 0xFE);
+    pmw3901mb_write(instance, 0x65, 0x1F);
+    pmw3901mb_write(instance, 0x72, 0x0A);
+    pmw3901mb_write(instance, 0x73, 0x00);
+    pmw3901mb_write(instance, 0x7F, 0x14);
+    pmw3901mb_write(instance, 0x44, 0x84);
+    pmw3901mb_write(instance, 0x65, 0x47);
+    pmw3901mb_write(instance, 0x66, 0x18);
+    pmw3901mb_write(instance, 0x63, 0x70);
+    pmw3901mb_write(instance, 0x6f, 0x2c);
+    pmw3901mb_write(instance, 0x7F, 0x15);
+    pmw3901mb_write(instance, 0x48, 0x48);
+    pmw3901mb_write(instance, 0x7F, 0x07);
+    pmw3901mb_write(instance, 0x41, 0x0D);
+    pmw3901mb_write(instance, 0x43, 0x14);
+    pmw3901mb_write(instance, 0x4B, 0x0E);
+    pmw3901mb_write(instance, 0x45, 0x0F);
+    pmw3901mb_write(instance, 0x44, 0x42);
+    pmw3901mb_write(instance, 0x4C, 0x80);
+    pmw3901mb_write(instance, 0x7F, 0x10);
+    pmw3901mb_write(instance, 0x5B, 0x03);
+    pmw3901mb_write(instance, 0x7F, 0x07);
+    pmw3901mb_write(instance, 0x40, 0x41);
 
-    instance->in_frame_capture_mode = false;
+    chThdSleepMilliseconds(10);
 
-    spi_device_init(&instance->spi_dev, spi_idx, select_line, 2000, 8, SPI_DEVICE_FLAG_CPHA|SPI_DEVICE_FLAG_CPOL);
-    spi_device_set_max_speed_hz(&instance->spi_dev, 2000000);
+    pmw3901mb_write(instance, 0x7F, 0x00);
+    pmw3901mb_write(instance, 0x32, 0x00);
+    pmw3901mb_write(instance, 0x7F, 0x07);
+    pmw3901mb_write(instance, 0x40, 0x40);
+    pmw3901mb_write(instance, 0x7F, 0x06);
+    pmw3901mb_write(instance, 0x68, 0x70);
+    pmw3901mb_write(instance, 0x69, 0x01);
+    pmw3901mb_write(instance, 0x7F, 0x0D);
+    pmw3901mb_write(instance, 0x48, 0xC0);
+    pmw3901mb_write(instance, 0x6F, 0xD5);
+    pmw3901mb_write(instance, 0x7F, 0x00);
+    pmw3901mb_write(instance, 0x5B, 0xA0);
+    pmw3901mb_write(instance, 0x4E, 0xA8);
+    pmw3901mb_write(instance, 0x5A, 0x50);
+    pmw3901mb_write(instance, 0x40, 0x80);
+    pmw3901mb_write(instance, 0x73, 0x1f);
 
-    chThdSleepMilliseconds(PMW3901MB_WAKEUP_MS);
-    pmw3901mb_write(instance, PMW3901MB_POWER_UP_RESET, 0x5A);
-    chThdSleepMilliseconds(1);
-    
-    // one-time read of registers per datasheet
-    pmw3901mb_read(instance, PMW3901MB_MOTION);
-    pmw3901mb_read(instance, PMW3901MB_DELTA_X_L);
-    pmw3901mb_read(instance, PMW3901MB_DELTA_X_H);
-    pmw3901mb_read(instance, PMW3901MB_DELTA_Y_L);
-    pmw3901mb_read(instance, PMW3901MB_DELTA_Y_H);
+    chThdSleepMilliseconds(10);
 
+    pmw3901mb_write(instance, 0x73, 0x00);
+}
+
+static void pmw3901mb_conf_3901(struct pmw3901mb_instance_s* instance) {
     // proprietary optimizations per datasheet
     pmw3901mb_write(instance, 0x7F, 0x00);
     pmw3901mb_write(instance, 0x61, 0xAD);
@@ -176,7 +261,54 @@ bool pmw3901mb_init(struct pmw3901mb_instance_s* instance, uint8_t spi_idx, uint
     pmw3901mb_write(instance, 0x4E, 0xA8);
     pmw3901mb_write(instance, 0x5A, 0x50);
     pmw3901mb_write(instance, 0x40, 0x80);
+}
+
+bool pmw3901mb_init(struct pmw3901mb_instance_s* instance, uint8_t spi_idx, uint32_t select_line) {
+    instance->in_frame_capture_mode = false;
+
+    spi_device_init(&instance->spi_dev, spi_idx, select_line, 2000, 8, SPI_DEVICE_FLAG_CPHA|SPI_DEVICE_FLAG_CPOL);
+    spi_device_set_max_speed_hz(&instance->spi_dev, 2000000);
+
+    chThdSleepMilliseconds(PMW3901MB_WAKEUP_MS);
+    pmw3901mb_write(instance, PMW3901MB_POWER_UP_RESET, 0x5A);
+    chThdSleepMilliseconds(1);
+
+    // check device ID
+    uint8_t product_id = pmw3901mb_read(instance, PMW3901MB_PRODUCT_ID);
+    uint8_t inv_product_id = pmw3901mb_read(instance, PMW3901MB_INVERSE_PRODUCT_ID);
+
+    if (product_id != 0x49 || inv_product_id != 0xB6) {
+        return false;
+    }
+
+    switch (pmw3901mb_read(instance, PMW3901MB_REVISION_ID)) {
+        case 0:
+            instance->pmw3901mb_type = PMW3901MB_TYPE_PMW3901MB;
+            break;
+        case 1:
+            instance->pmw3901mb_type = PMW3901MB_TYPE_PAW3903;
+            break;
+        default:
+            return false;
+    }
+
     
+    // one-time read of registers per datasheet
+    pmw3901mb_read(instance, PMW3901MB_MOTION);
+    pmw3901mb_read(instance, PMW3901MB_DELTA_X_L);
+    pmw3901mb_read(instance, PMW3901MB_DELTA_X_H);
+    pmw3901mb_read(instance, PMW3901MB_DELTA_Y_L);
+    pmw3901mb_read(instance, PMW3901MB_DELTA_Y_H);
+
+    switch (instance->pmw3901mb_type) {
+        case PMW3901MB_TYPE_PMW3901MB:
+            pmw3901mb_conf_3901(instance);
+            break;
+        case PMW3901MB_TYPE_PAW3903:
+            pmw3901mb_conf_3903_bright(instance);
+            break;
+    }
+
     return true;
 }
 
