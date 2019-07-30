@@ -288,7 +288,7 @@ static void boot_app_if_commanded(void)
     }
 
     union shared_msg_payload_u msg;
-    boot_msg_fill_shared_canbus_info(&msg.canbus_info);
+    memcpy(&msg.canbus_info, &boot_msg.canbus_info, sizeof(boot_msg.canbus_info));
     msg.boot_info_msg.boot_reason = boot_msg.boot_msg.boot_reason;
     msg.boot_info_msg.hw_info = &_hw_info;
 
@@ -311,19 +311,8 @@ static void command_boot_if_app_valid(uint8_t boot_reason) {
     }
 
     union shared_msg_payload_u msg;
+    boot_msg_fill_shared_canbus_info(&msg.canbus_info);
     msg.boot_msg.boot_reason = boot_reason;
-
-    if (get_boot_msg_valid() && boot_msg.canbus_info.baudrate) {
-        msg.boot_msg.canbus_info.baudrate = boot_msg.canbus_info.baudrate;
-    }
-
-#ifdef MODULE_CAN_ENABLED
-    if (can_get_baudrate_confirmed(0)) {
-        msg.boot_msg.canbus_info.baudrate = can_get_baudrate(0);
-    } else {
-        msg.boot_msg.canbus_info.baudrate = 0;
-    }
-#endif
 
     shared_msg_finalize_and_write(SHARED_MSG_BOOT, &msg);
 
