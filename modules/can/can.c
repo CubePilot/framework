@@ -492,3 +492,7 @@ void can_driver_rx_frame_received_I(struct can_instance_s* instance, uint8_t mb_
     worker_thread_publisher_task_publish_I(&instance->rx_publisher_task, &instance->rx_topic, sizeof(struct can_rx_frame_s), can_fill_rx_frame_I, &can_fill_rx_frame_params);
     instance->baudrate_confirmed = true;
 }
+
+bool can_driver_get_mailbox_transmit_pending(struct can_instance_s* instance, uint8_t mb_idx) {
+    return instance->tx_mailbox[mb_idx].state == CAN_TX_MAILBOX_PENDING;
+}

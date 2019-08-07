@@ -215,24 +215,35 @@ static void stm32_can_rx_handler(struct can_driver_stm32_instance_s* instance) {
     }
 }
 
+#define CAN_TSR_RQCP(i) ((i==0) ? (CAN_TSR_RQCP0) : (i==1) ? (CAN_TSR_RQCP1) : (i==2) ? (CAN_TSR_RQCP2) : 0)
+#define CAN_TSR_TXOK(i) ((i==0) ? (CAN_TSR_TXOK0) : (i==1) ? (CAN_TSR_TXOK1) : (i==2) ? (CAN_TSR_TXOK2) : 0)
+#define CAN_TSR_ALST(i) ((i==0) ? (CAN_TSR_ALST0) : (i==1) ? (CAN_TSR_ALST1) : (i==2) ? (CAN_TSR_ALST2) : 0)
+#define CAN_TSR_TERR(i) ((i==0) ? (CAN_TSR_TERR0) : (i==1) ? (CAN_TSR_TERR1) : (i==2) ? (CAN_TSR_TERR2) : 0)
+
 static void stm32_can_tx_handler(struct can_driver_stm32_instance_s* instance) {
     systime_t t_now = chVTGetSystemTimeX();
 
     chSysLockFromISR();
-    if ((instance->can->TSR & CAN_TSR_RQCP0) != 0) {
-        can_driver_tx_request_complete_I(instance->frontend, 0, (instance->can->TSR & CAN_TSR_TXOK0) != 0, t_now);
-        instance->can->TSR = CAN_TSR_RQCP0;
+
+    for (uint8_t i=0; i<NUM_TX_MAILBOXES; i++) {
+        if ((instance->can->TSR & CAN_TSR_RQCP(i)) != 0) {
+            if ((instance->can->TSR & CAN_TSR_TXOK(i)) != 0) {
+                 // Successful transmit
+                instance->can->TSR = CAN_TSR_RQCP(i);
+                can_driver_tx_request_complete_I(instance->frontend, i, true, t_now);
+            } else if ((instance->can->MCR & CAN_MCR_NART) != 0 && can_driver_get_mailbox_transmit_pending(instance->frontend, i) && (instance->can->TSR & CAN_TSR_TERR(i)) == 0) {
+                // transmit failed and NART enabled and transmit is still desired and arbitration lost and no errors
+                // retransmit this mailbox
+                instance->can->TSR = CAN_TSR_RQCP(i);
+                instance->can->sTxMailBox[i].TIR |= CAN_TI0R_TXRQ;
+            } else {
+                // transmit failed
+                instance->can->TSR = CAN_TSR_RQCP(i);
+                can_driver_tx_request_complete_I(instance->frontend, i, false, t_now);
+            }
+        }
     }
 
-    if ((instance->can->TSR & CAN_TSR_RQCP1) != 0) {
-        can_driver_tx_request_complete_I(instance->frontend, 1, (instance->can->TSR & CAN_TSR_TXOK1) != 0, t_now);
-        instance->can->TSR = CAN_TSR_RQCP1;
-    }
-
-    if ((instance->can->TSR & CAN_TSR_RQCP2) != 0) {
-        can_driver_tx_request_complete_I(instance->frontend, 2, (instance->can->TSR & CAN_TSR_TXOK2) != 0, t_now);
-        instance->can->TSR = CAN_TSR_RQCP2;
-    }
     chSysUnlockFromISR();
 }
 

@@ -19,3 +19,4 @@ struct can_driver_iface_s {
 struct can_instance_s* can_driver_register(uint8_t can_idx, void* driver_ctx, const struct can_driver_iface_s* driver_iface, uint8_t num_tx_mailboxes, uint8_t num_rx_mailboxes, uint8_t rx_fifo_depth);
 void can_driver_tx_request_complete_I(struct can_instance_s* instance, uint8_t mb_idx, bool transmit_success, systime_t completion_systime);
 void can_driver_rx_frame_received_I(struct can_instance_s* instance, uint8_t mb_idx, systime_t rx_systime, struct can_frame_s* frame);
+bool can_driver_get_mailbox_transmit_pending(struct can_instance_s* instance, uint8_t mb_idx);
