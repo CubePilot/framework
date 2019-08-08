@@ -28,25 +28,24 @@ WORKER_THREAD_DECLARE_EXTERN(WT)
 static struct worker_thread_timer_task_s load_print_task;
 static void load_print_task_func(struct worker_thread_timer_task_s* task);
 
-static time_measurement_t cumtime;
+systime_t meas_begin_t;
+systime_t idle_enter_t;
+systime_t idle_total_ticks;
 
 RUN_AFTER(WORKER_THREADS_INIT) {
-    chTMStartMeasurementX(&cumtime);
-    worker_thread_add_timer_task(&WT, &load_print_task, load_print_task_func, NULL, LL_S2ST(5), true);
+    meas_begin_t = chVTGetSystemTimeX();
+    idle_total_ticks = 0;
+    worker_thread_add_timer_task(&WT, &load_print_task, load_print_task_func, NULL, LL_MS2ST(5000), true);
 }
 
 static void load_print_task_func(struct worker_thread_timer_task_s* task) {
     (void)task;
 
-    chTMStopMeasurementX(&cumtime);
-    chTMStartMeasurementX(&cumtime);
+    systime_t tnow = chVTGetSystemTimeX();
+    uint32_t load = (uint64_t)10000*idle_total_ticks/(tnow-meas_begin_t);
 
-    thread_t* thread = chRegFirstThread();
-    while(thread) {
-        uint32_t load = 10000*thread->stats.cumulative/cumtime.cumulative;
-        uavcan_send_debug_msg(UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_INFO, "load", "%s: %u.%02u%% %u", thread->name, load/100, load%100, (unsigned)thread->stats.cumulative);
-        thread->stats.cumulative = 0;
-        thread = chRegNextThread(thread);
-    }
-    cumtime.cumulative = 0;
+    uavcan_send_debug_msg(UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_INFO, "load", "idle %u.%02u%% (%u/%u)", load/100, load%100, idle_total_ticks, tnow-meas_begin_t);
+
+    meas_begin_t = tnow;
+    idle_total_ticks = 0;
 }

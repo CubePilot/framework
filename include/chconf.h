@@ -4,6 +4,19 @@
 
 #define _CHIBIOS_RT_CONF_
 
+#ifdef MODULE_LOAD_MEASUREMENT_ENABLED
+#define CH_CFG_IDLE_ENTER_HOOK() {                                          \
+    extern systime_t idle_enter_t;                                          \
+    idle_enter_t = chVTGetSystemTimeX();                                    \
+}
+
+#define CH_CFG_IDLE_LEAVE_HOOK() {                                          \
+    extern systime_t idle_enter_t;                                          \
+    extern systime_t idle_total_ticks;                                      \
+    idle_total_ticks += chVTGetSystemTimeX()-idle_enter_t;                  \
+}
+#endif
+
 /**
  * @brief   OS optimization.
  * @details If enabled then time efficient rather than space efficient code
