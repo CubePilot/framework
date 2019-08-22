@@ -35,5 +35,5 @@ UDEFS += -DTARGET_BOOTLOADER
 
 include ../include.mk
 
-upload: build/$(BOARD)/bootloader.elf
+upload: build/$(BOARD)/$(PROJECT).elf
 	openocd -f openocd.cfg -c "program $< verify reset exit"
