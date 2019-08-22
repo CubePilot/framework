@@ -430,7 +430,7 @@ static bool _uavcan_send(struct uavcan_instance_s* instance, const struct uavcan
         memcpy(tx_state.frame_list_head->content.data, &crc16, 2);
     }
 
-    can_enqueue_tx_frames(instance->can_instance, &tx_state.frame_list_head, timeout, completion_topic);
+    can_enqueue_tx_frames(instance->can_instance, &tx_state.frame_list_head, timeout, completion_topic, CAN_FRAME_ORIGIN_LOCAL);
 
     return true;
 }
@@ -494,6 +494,10 @@ static void uavcan_can_rx_handler(size_t msg_size, const void* msg, void* ctx) {
     struct uavcan_instance_s* instance = ctx;
 
     const struct can_rx_frame_s* frame = msg;
+
+    if (frame->origin == CAN_FRAME_ORIGIN_LOCAL) {
+        return;
+    }
 
     CanardCANFrame canard_frame = convert_can_frame_to_CanardCANFrame(&frame->content);
 
