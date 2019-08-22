@@ -34,8 +34,12 @@ bool can_get_baudrate_confirmed(struct can_instance_s* instance);
 struct can_tx_frame_s* can_allocate_tx_frame_and_append_I(struct can_instance_s* instance, struct can_tx_frame_s** frame_list);
 struct can_tx_frame_s* can_allocate_tx_frame_and_append(struct can_instance_s* instance, struct can_tx_frame_s** frame_list);
 struct can_tx_frame_s* can_allocate_tx_frames(struct can_instance_s* instance, size_t num_frames);
-void can_enqueue_tx_frames(struct can_instance_s* instance, struct can_tx_frame_s** frame_list, systime_t tx_timeout, struct pubsub_topic_s* completion_topic);
+void can_enqueue_tx_frames(struct can_instance_s* instance, struct can_tx_frame_s** frame_list, systime_t tx_timeout, struct pubsub_topic_s* completion_topic, enum can_frame_origin_t origin);
 void can_free_tx_frames(struct can_instance_s* instance, struct can_tx_frame_s** frame_list);
 
 bool can_send_I(struct can_instance_s* instance, struct can_frame_s* frame, systime_t tx_timeout, struct pubsub_topic_s* completion_topic);
 bool can_send(struct can_instance_s* instance, struct can_frame_s* frame, systime_t tx_timeout, struct pubsub_topic_s* completion_topic);
+
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+void can_bridge_transmit(struct can_instance_s* instance, const struct can_frame_s* frame);
+#endif

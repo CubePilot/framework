@@ -56,7 +56,12 @@ struct can_instance_s {
     struct can_tx_queue_s tx_queue;
 
     struct pubsub_topic_s rx_topic;
+
     struct worker_thread_publisher_task_s rx_publisher_task;
+
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+    struct worker_thread_publisher_task_s loopback_publisher_task;
+#endif
 
     struct worker_thread_publisher_task_s tx_publisher_task;
 
@@ -243,16 +248,43 @@ struct can_tx_frame_s* can_allocate_tx_frames(struct can_instance_s* instance, s
     return ret;
 }
 
-void can_enqueue_tx_frames(struct can_instance_s* instance, struct can_tx_frame_s** frame_list, systime_t tx_timeout, struct pubsub_topic_s* completion_topic) {
+void can_enqueue_tx_frames(struct can_instance_s* instance, struct can_tx_frame_s** frame_list, systime_t tx_timeout, struct pubsub_topic_s* completion_topic, enum can_frame_origin_t origin) {
     if (!instance) {
         return;
     }
-    
+
     systime_t t_now = chVTGetSystemTimeX();
 
     struct can_tx_frame_s* frame = *frame_list;
+
+    // When in silent mode and bridge interface is enabled, loop back frames as received immediately and then free the frames and return
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+    if (instance->silent) {
+        while (frame != NULL) {
+            struct can_tx_frame_s* next_frame = frame->next;
+
+            struct can_rx_frame_s rx_frame;
+            rx_frame.content = frame->content;
+            rx_frame.rx_systime = t_now;
+            rx_frame.on_physical_bus = false;
+            rx_frame.origin = origin;
+
+            pubsub_publish_message(&instance->rx_topic, sizeof(struct can_rx_frame_s), pubsub_copy_writer_func, &rx_frame);
+
+            frame = next_frame;
+        }
+        can_free_tx_frames(instance, frame_list);
+        return;
+    }
+#endif
+
+
     while (frame != NULL) {
         struct can_tx_frame_s* next_frame = frame->next;
+
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+        frame->origin = origin;
+#endif
 
         frame->creation_systime = t_now;
         frame->tx_timeout = tx_timeout;
@@ -283,6 +315,19 @@ void can_free_tx_frames(struct can_instance_s* instance, struct can_tx_frame_s**
     
     *frame_list = NULL;
 }
+
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+void can_bridge_transmit(struct can_instance_s* instance, const struct can_frame_s* frame) {
+    struct can_tx_frame_s* tx_frame = can_allocate_tx_frames(instance, 1);
+    if (!tx_frame) {
+        return;
+    }
+
+    tx_frame->content = *frame;
+
+    can_enqueue_tx_frames(instance, &tx_frame, LL_MS2ST(2000), NULL, CAN_FRAME_ORIGIN_BRIDGE);
+}
+#endif
 
 struct can_instance_s* can_driver_register(uint8_t can_idx, void* driver_ctx, const struct can_driver_iface_s* driver_iface, uint8_t num_tx_mailboxes, uint8_t num_rx_mailboxes, uint8_t rx_fifo_depth) {
     if (can_get_instance(can_idx) != NULL) {
@@ -328,6 +373,10 @@ struct can_instance_s* can_driver_register(uint8_t can_idx, void* driver_ctx, co
 
     pubsub_init_topic(&instance->rx_topic, NULL); // TODO specific/configurable topic group
     worker_thread_add_publisher_task(&WT_TRX, &instance->rx_publisher_task, sizeof(struct can_rx_frame_s), num_rx_mailboxes*rx_fifo_depth);
+
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+    worker_thread_add_publisher_task(&WT_TRX, &instance->loopback_publisher_task, sizeof(struct can_rx_frame_s), num_tx_mailboxes*4);
+#endif
 
     worker_thread_add_publisher_task(&WT_TRX, &instance->tx_publisher_task, sizeof(struct can_transmit_completion_msg_s), num_tx_mailboxes*4);
 
@@ -416,6 +465,19 @@ static void can_reschedule_expire_timer(struct can_instance_s* instance) {
 static void can_tx_frame_completed_I(struct can_instance_s* instance, struct can_tx_frame_s* frame, bool success, systime_t completion_systime) {
     chDbgCheckClassI();
 
+    // Loop back all successful transmits as received frames
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+    if (success) {
+        struct can_rx_frame_s rx_frame;
+        rx_frame.content = frame->content;
+        rx_frame.rx_systime = completion_systime;
+        rx_frame.on_physical_bus = true;
+        rx_frame.origin = frame->origin;
+
+        worker_thread_publisher_task_publish_I(&instance->loopback_publisher_task, &instance->rx_topic, sizeof(struct can_rx_frame_s), pubsub_copy_writer_func, &rx_frame);
+    }
+#endif
+
     if (frame->completion_topic) {
         struct can_transmit_completion_msg_s msg = { completion_systime, success };
         worker_thread_publisher_task_publish_I(&instance->tx_publisher_task, frame->completion_topic, sizeof(struct can_transmit_completion_msg_s), pubsub_copy_writer_func, &msg);
@@ -423,9 +485,9 @@ static void can_tx_frame_completed_I(struct can_instance_s* instance, struct can
     chPoolFreeI(&instance->frame_pool, frame);
 }
 
-static void can_tx_frame_completed(struct can_instance_s* instance, struct can_tx_frame_s* frame, bool success, systime_t completion_systime) {
+static void can_tx_frame_expired(struct can_instance_s* instance, struct can_tx_frame_s* frame, systime_t completion_systime) {
     if (frame->completion_topic) {
-        struct can_transmit_completion_msg_s msg = { completion_systime, success };
+        struct can_transmit_completion_msg_s msg = { completion_systime, false };
         pubsub_publish_message(frame->completion_topic, sizeof(struct can_transmit_completion_msg_s), pubsub_copy_writer_func, &msg);
     }
     chPoolFree(&instance->frame_pool, frame);
@@ -448,7 +510,7 @@ static void can_expire_handler(struct worker_thread_timer_task_s* task) {
     // Abort expired queue items
     struct can_tx_frame_s* frame;
     while ((frame = can_tx_queue_pop_expired(&instance->tx_queue)) != NULL) {
-        can_tx_frame_completed(instance, frame, false, chVTGetSystemTimeX());
+        can_tx_frame_expired(instance, frame, chVTGetSystemTimeX());
     }
 
     can_try_enqueue_waiting_frame(instance);
@@ -466,30 +528,18 @@ void can_driver_tx_request_complete_I(struct can_instance_s* instance, uint8_t m
     can_try_enqueue_waiting_frame_I(instance);
 }
 
-struct can_fill_rx_frame_params_s {
-    systime_t rx_systime;
-    struct can_frame_s* frame;
-};
-
-static void can_fill_rx_frame_I(size_t msg_size, void* msg, void* ctx) {
-    (void)msg_size;
-
-    chDbgCheckClassI();
-
-    struct can_fill_rx_frame_params_s* params = ctx;
-    struct can_rx_frame_s* frame = msg;
-
-    frame->content = *params->frame;
-    frame->rx_systime = params->rx_systime;
-}
-
 void can_driver_rx_frame_received_I(struct can_instance_s* instance, uint8_t mb_idx, systime_t rx_systime, struct can_frame_s* frame) {
     (void)mb_idx;
 
     chDbgCheckClassI();
 
-    struct can_fill_rx_frame_params_s can_fill_rx_frame_params = {rx_systime, frame};
-    worker_thread_publisher_task_publish_I(&instance->rx_publisher_task, &instance->rx_topic, sizeof(struct can_rx_frame_s), can_fill_rx_frame_I, &can_fill_rx_frame_params);
+    struct can_rx_frame_s rx_frame;
+    rx_frame.content = *frame;
+    rx_frame.rx_systime = rx_systime;
+    rx_frame.origin = CAN_FRAME_ORIGIN_CAN_BUS;
+    rx_frame.on_physical_bus = true;
+
+    worker_thread_publisher_task_publish_I(&instance->rx_publisher_task, &instance->rx_topic, sizeof(struct can_rx_frame_s), pubsub_copy_writer_func, &rx_frame);
     instance->baudrate_confirmed = true;
 }
 
