@@ -199,7 +199,18 @@ void can_stop_I(struct can_instance_s* instance) {
 
     if (instance->started) {
         instance->driver_iface->stop(instance->driver_ctx);
-        instance->started = true;
+
+        // Empty the mailboxes
+        for (uint8_t i=0; i<instance->num_tx_mailboxes; i++) {
+            if (instance->tx_mailbox[i].state == CAN_TX_MAILBOX_PENDING) {
+                can_tx_queue_push_ahead_I(&instance->tx_queue, instance->tx_mailbox[i].frame);
+            } else if (instance->tx_mailbox[i].state == CAN_TX_MAILBOX_ABORTING) {
+                can_tx_frame_completed_I(instance, instance->tx_mailbox[i].frame, false, chVTGetSystemTimeX());
+            }
+
+            instance->tx_mailbox[i].state = CAN_TX_MAILBOX_EMPTY;
+        }
+        instance->started = false;
     }
 }
 
