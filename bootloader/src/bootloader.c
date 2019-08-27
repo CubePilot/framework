@@ -196,6 +196,11 @@ static void file_read_response_handler(size_t msg_size, const void* buf, void* c
             return;
         }
 
+        if (res->data_len == 0) {
+            on_update_complete();
+            return;
+        }
+
         int32_t curr_page = get_app_page_from_ofs(flash_state.ofs + res->data_len);
         if (curr_page > flash_state.last_erased_page) {
             for (int32_t i=flash_state.last_erased_page+1; i<=curr_page; i++) {
