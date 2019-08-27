@@ -2,8 +2,8 @@ CSRC = $(shell find src -name "*.c")
 INCDIR = ./include
 
 MODULE_SEARCH_DIRS = modules
-USE_PROCESS_STACKSIZE = 1280
-USE_EXCEPTIONS_STACKSIZE = 256
+USE_PROCESS_STACKSIZE = 2048
+USE_EXCEPTIONS_STACKSIZE = 2048
 
 MODULES_ENABLED = \
 chibios_sys_init \
@@ -21,7 +21,8 @@ can \
 can_autobaud \
 uavcan \
 uavcan_nodestatus_publisher \
-uavcan_allocatee
+uavcan_allocatee \
+usb_slcan
 
 MESSAGES_ENABLED = \
 uavcan.protocol.GetNodeInfo \
