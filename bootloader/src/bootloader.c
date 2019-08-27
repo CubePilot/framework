@@ -82,7 +82,7 @@ static void boot_app_if_commanded(void);
 static void command_boot_if_app_valid(uint8_t boot_reason);
 static void start_boot_timer(systime_t timeout);
 static void cancel_boot_timer(void);
-static bool check_and_start_boot_timer(void);
+static void check_and_start_boot_timer(void);
 static void erase_app_page(uint32_t page_num);
 static void do_fail_update(void);
 static void on_update_complete(void);
@@ -338,12 +338,16 @@ static void cancel_boot_timer(void) {
     worker_thread_remove_timer_task(&WT, &bootloader_state.boot_timer_task);
 }
 
-static bool check_and_start_boot_timer(void) {
-    if (app_info.shared_app_parameters && app_info.shared_app_parameters->boot_delay_sec != 0) {
-        start_boot_timer(LL_S2ST((uint32_t)app_info.shared_app_parameters->boot_delay_sec));
-        return true;
+static void check_and_start_boot_timer(void) {
+    if (get_boot_msg_valid() && boot_msg_id == SHARED_MSG_BOOTLOADER_HOLD) {
+        return;
     }
-    return false;
+
+    if (!app_info.shared_app_parameters || app_info.shared_app_parameters->boot_delay_sec == 0) {
+        return;
+    }
+
+    start_boot_timer(LL_S2ST((uint32_t)app_info.shared_app_parameters->boot_delay_sec));
 }
 
 static void erase_app_page(uint32_t page_num) {

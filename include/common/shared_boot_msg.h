@@ -11,7 +11,8 @@ enum shared_msg_t {
     SHARED_MSG_BOOT = 0,
     SHARED_MSG_FIRMWAREUPDATE = 1,
     SHARED_MSG_BOOT_INFO = 2,
-    SHARED_MSG_CANBUS_INFO = 3
+    SHARED_MSG_CANBUS_INFO = 3,
+    SHARED_MSG_BOOTLOADER_HOLD = 4
 };
 
 struct shared_canbus_info_s {
@@ -47,6 +48,10 @@ struct shared_firmwareupdate_msg_s {
     struct shared_canbus_info_s canbus_info;
     uint8_t source_node_id;
     char path[201];
+} SHARED_MSG_PACKED;
+
+struct shared_bootloader_hold_msg_s {
+    struct shared_canbus_info_s canbus_info;
 } SHARED_MSG_PACKED;
 
 struct shared_boot_info_msg_s {
