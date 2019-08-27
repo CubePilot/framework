@@ -222,7 +222,7 @@ static void file_read_response_handler(size_t msg_size, const void* buf, void* c
 static void do_resend_read_request(void) {
     struct uavcan_protocol_file_Read_req_s read_req;
     read_req.offset =  flash_state.ofs;
-    strncpy(read_req.path.path,flash_state.path,sizeof(read_req.path));
+    strncpy((char*)read_req.path.path,flash_state.path,sizeof(read_req.path));
     read_req.path.path_len = strnlen(flash_state.path,sizeof(read_req.path));
     uavcan_request(flash_state.uavcan_idx, &uavcan_protocol_file_Read_req_descriptor, CANARD_TRANSFER_PRIORITY_HIGH, flash_state.source_node_id, &read_req);
     worker_thread_timer_task_reschedule(&WT, &flash_state.read_timeout_task, LL_MS2ST(500));
