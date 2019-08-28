@@ -60,6 +60,7 @@ struct can_instance_s {
     struct worker_thread_publisher_task_s rx_publisher_task;
 
 #ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+    bool loopback_immediate;
     struct worker_thread_publisher_task_s loopback_publisher_task;
 #endif
 
@@ -79,6 +80,7 @@ static void can_reschedule_expire_timer_I(struct can_instance_s* instance);
 static void can_reschedule_expire_timer(struct can_instance_s* instance);
 static void can_try_enqueue_waiting_frame_I(struct can_instance_s* instance);
 static void can_try_enqueue_waiting_frame(struct can_instance_s* instance);
+static void can_tx_frame_completed_I(struct can_instance_s* instance, struct can_tx_frame_s* frame, bool success, systime_t completion_systime);
 
 bool can_iterate_instances(struct can_instance_s** instance_ptr) {
     if (!instance_ptr) {
@@ -184,6 +186,8 @@ void can_start_I(struct can_instance_s* instance, bool silent, bool auto_retrans
         instance->baudrate_confirmed = false;
     }
     instance->baudrate = baudrate;
+
+    can_try_enqueue_waiting_frame_I(instance);
 }
 
 void can_start(struct can_instance_s* instance, bool silent, bool auto_retransmit, uint32_t baudrate) {
@@ -268,11 +272,12 @@ void can_enqueue_tx_frames(struct can_instance_s* instance, struct can_tx_frame_
 
     struct can_tx_frame_s* frame = *frame_list;
 
-    // When in silent mode and bridge interface is enabled, loop back frames as received immediately and then free the frames and return
+    // When in loopback immediate mode or silent mode, loop back immediately and flag frames as already looped-back.
 #ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
-    if (instance->silent) {
+    if (!instance->started || instance->silent || instance->loopback_immediate) {
         while (frame != NULL) {
             struct can_tx_frame_s* next_frame = frame->next;
+            frame->already_loopedback = true;
 
             struct can_rx_frame_s rx_frame;
             rx_frame.content = frame->content;
@@ -284,11 +289,27 @@ void can_enqueue_tx_frames(struct can_instance_s* instance, struct can_tx_frame_
 
             frame = next_frame;
         }
+    } else {
+        while (frame != NULL) {
+            struct can_tx_frame_s* next_frame = frame->next;
+            frame->already_loopedback = false;
+            frame = next_frame;
+        }
+    }
+
+    frame = *frame_list;
+#endif
+
+    // If not started or in silent mode, fail immediately
+    if (!instance->started || instance->silent) {
+        if (completion_topic) {
+            struct can_transmit_completion_msg_s msg = { t_now, false };
+            pubsub_publish_message(completion_topic, sizeof(struct can_transmit_completion_msg_s), pubsub_copy_writer_func, &msg);
+        }
+
         can_free_tx_frames(instance, frame_list);
         return;
     }
-#endif
-
 
     while (frame != NULL) {
         struct can_tx_frame_s* next_frame = frame->next;
@@ -386,6 +407,7 @@ struct can_instance_s* can_driver_register(uint8_t can_idx, void* driver_ctx, co
     worker_thread_add_publisher_task(&WT_TRX, &instance->rx_publisher_task, sizeof(struct can_rx_frame_s), num_rx_mailboxes*rx_fifo_depth);
 
 #ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+    instance->loopback_immediate = true;
     worker_thread_add_publisher_task(&WT_TRX, &instance->loopback_publisher_task, sizeof(struct can_rx_frame_s), num_tx_mailboxes*4);
 #endif
 
@@ -400,6 +422,10 @@ struct can_instance_s* can_driver_register(uint8_t can_idx, void* driver_ctx, co
 
 static void can_try_enqueue_waiting_frame_I(struct can_instance_s* instance) {
     chDbgCheckClassI();
+
+    if (!instance->started) {
+        return;
+    }
     
     // Enqueue the next frame if it will be the highest priority
     bool have_empty_mailbox = false;
@@ -478,7 +504,7 @@ static void can_tx_frame_completed_I(struct can_instance_s* instance, struct can
 
     // Loop back all successful transmits as received frames
 #ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
-    if (success) {
+    if (success && !frame->already_loopedback) {
         struct can_rx_frame_s rx_frame;
         rx_frame.content = frame->content;
         rx_frame.rx_systime = completion_systime;
