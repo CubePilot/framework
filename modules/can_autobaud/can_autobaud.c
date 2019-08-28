@@ -2,6 +2,10 @@
 #include <modules/can/can.h>
 #include <modules/worker_thread/worker_thread.h>
 
+#ifdef MODULE_PARAM_ENABLED
+#include <modules/param/param.h>
+#endif
+
 #ifdef MODULE_APP_DESCRIPTOR_ENABLED
 #include <modules/app_descriptor/app_descriptor.h>
 #endif
@@ -18,6 +22,10 @@
 WORKER_THREAD_DECLARE_EXTERN(WT)
 
 #define CAN_AUTOBAUD_SWITCH_INTERVAL_US 1000000
+
+#ifdef MODULE_PARAM_ENABLED
+PARAM_DEFINE_UINT32_PARAM_STATIC(can_bitrate_param, "can1.bitrate", 1000000, 0, 1000000)
+#endif
 
 static const uint32_t valid_baudrates[] = {1000000, 500000, 250000, 125000};
 
@@ -44,6 +52,13 @@ RUN_AFTER(CAN_INIT) {
     }
 
     if (shared_get_parameters(&shared_app_descriptor)->canbus_disable_auto_baud) {
+        canbus_autobaud_enable = false;
+    }
+#endif
+
+#ifdef MODULE_PARAM_ENABLED
+    if (can_bitrate_param != 0) {
+        canbus_baud = can_bitrate_param;
         canbus_autobaud_enable = false;
     }
 #endif
