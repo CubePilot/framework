@@ -128,11 +128,11 @@ static void allocation_start_request_timer(struct allocatee_instance_s* instance
         return;
     }
 
-    float request_delay_us = UAVCAN_PROTOCOL_DYNAMIC_NODE_ID_ALLOCATION_MIN_REQUEST_PERIOD_MS + (getRandomFloat() * (UAVCAN_PROTOCOL_DYNAMIC_NODE_ID_ALLOCATION_MAX_REQUEST_PERIOD_MS-UAVCAN_PROTOCOL_DYNAMIC_NODE_ID_ALLOCATION_MIN_REQUEST_PERIOD_MS));
-    request_delay_us *= 1000;
+    float request_delay_ms = UAVCAN_PROTOCOL_DYNAMIC_NODE_ID_ALLOCATION_MIN_REQUEST_PERIOD_MS + (getRandomFloat() * (UAVCAN_PROTOCOL_DYNAMIC_NODE_ID_ALLOCATION_MAX_REQUEST_PERIOD_MS-UAVCAN_PROTOCOL_DYNAMIC_NODE_ID_ALLOCATION_MIN_REQUEST_PERIOD_MS));
+    float request_delay_ticks = request_delay_ms * LL_MS2ST(1);
 
     worker_thread_remove_timer_task(&WT, &instance->request_transmit_task);
-    worker_thread_add_timer_task(&WT, &instance->request_transmit_task, allocation_timer_expired, instance, LL_US2ST(request_delay_us), false);
+    worker_thread_add_timer_task(&WT, &instance->request_transmit_task, allocation_timer_expired, instance, request_delay_ticks, false);
 }
 
 static void allocation_start_followup_timer(struct allocatee_instance_s* instance) {
@@ -141,11 +141,11 @@ static void allocation_start_followup_timer(struct allocatee_instance_s* instanc
         return;
     }
 
-    float request_delay_us = UAVCAN_PROTOCOL_DYNAMIC_NODE_ID_ALLOCATION_MIN_FOLLOWUP_DELAY_MS + (getRandomFloat() * (UAVCAN_PROTOCOL_DYNAMIC_NODE_ID_ALLOCATION_MAX_FOLLOWUP_DELAY_MS-UAVCAN_PROTOCOL_DYNAMIC_NODE_ID_ALLOCATION_MIN_FOLLOWUP_DELAY_MS));
-    request_delay_us *= 1000;
+    float request_delay_ms = UAVCAN_PROTOCOL_DYNAMIC_NODE_ID_ALLOCATION_MIN_FOLLOWUP_DELAY_MS + (getRandomFloat() * (UAVCAN_PROTOCOL_DYNAMIC_NODE_ID_ALLOCATION_MAX_FOLLOWUP_DELAY_MS-UAVCAN_PROTOCOL_DYNAMIC_NODE_ID_ALLOCATION_MIN_FOLLOWUP_DELAY_MS));
+    float request_delay_ticks = request_delay_ms * LL_MS2ST(1);
 
     worker_thread_remove_timer_task(&WT, &instance->request_transmit_task);
-    worker_thread_add_timer_task(&WT, &instance->request_transmit_task, allocation_timer_expired, instance, LL_US2ST(request_delay_us), false);
+    worker_thread_add_timer_task(&WT, &instance->request_transmit_task, allocation_timer_expired, instance, request_delay_ticks, false);
 }
 
 static bool allocation_running(struct allocatee_instance_s* instance) {
