@@ -45,16 +45,8 @@ static struct {
     uint8_t retries;
     uint8_t source_node_id;
     int32_t last_erased_page;
-    struct worker_thread_timer_task_s read_timeout_task;
     char path[201];
 } flash_state;
-
-static struct {
-    bool in_progress;
-    size_t ofs;
-    int32_t last_erased_page;
-    struct worker_thread_timer_task_s boot_timer_task;
-} bootloader_state;
 
 static struct {
     const struct shared_app_descriptor_s* shared_app_descriptor;
@@ -63,6 +55,8 @@ static struct {
     const struct shared_app_parameters_s* shared_app_parameters;
 } app_info;
 
+static struct worker_thread_timer_task_s boot_timer_task;
+static struct worker_thread_timer_task_s read_timeout_task;
 static struct worker_thread_listener_task_s beginfirmwareupdate_req_listener_task;
 static struct worker_thread_listener_task_s file_read_res_task;
 static struct worker_thread_listener_task_s restart_req_listener_task;
@@ -177,7 +171,7 @@ static void begin_flash_from_path(uint8_t uavcan_idx, uint8_t source_node_id, co
     flash_state.source_node_id = source_node_id;
     flash_state.uavcan_idx = uavcan_idx;
     strncpy(flash_state.path, path, 200);
-    worker_thread_add_timer_task(&WT, &flash_state.read_timeout_task, read_request_response_timeout, NULL, LL_MS2ST(500), false);
+    worker_thread_add_timer_task(&WT, &read_timeout_task, read_request_response_timeout, NULL, LL_MS2ST(500), false);
     do_send_read_request();
 
     corrupt_app();
@@ -225,7 +219,7 @@ static void do_resend_read_request(void) {
     strncpy((char*)read_req.path.path,flash_state.path,sizeof(read_req.path));
     read_req.path.path_len = strnlen(flash_state.path,sizeof(read_req.path));
     uavcan_request(flash_state.uavcan_idx, &uavcan_protocol_file_Read_req_descriptor, CANARD_TRANSFER_PRIORITY_HIGH, flash_state.source_node_id, &read_req);
-    worker_thread_timer_task_reschedule(&WT, &flash_state.read_timeout_task, LL_MS2ST(500));
+    worker_thread_timer_task_reschedule(&WT, &read_timeout_task, LL_MS2ST(500));
     flash_state.retries++;
 }
 
@@ -331,11 +325,11 @@ static void start_boot(struct worker_thread_timer_task_s* task)
 }
 
 static void start_boot_timer(systime_t timeout) {
-    worker_thread_add_timer_task(&WT, &bootloader_state.boot_timer_task, start_boot, NULL, timeout, false);
+    worker_thread_add_timer_task(&WT, &boot_timer_task, start_boot, NULL, timeout, false);
 }
 
 static void cancel_boot_timer(void) {
-    worker_thread_remove_timer_task(&WT, &bootloader_state.boot_timer_task);
+    worker_thread_remove_timer_task(&WT, &boot_timer_task);
 }
 
 static void check_and_start_boot_timer(void) {
@@ -362,7 +356,7 @@ static void do_fail_update(void) {
 
 static void on_update_complete(void) {
     flash_state.in_progress = false;
-    worker_thread_remove_timer_task(&WT, &flash_state.read_timeout_task);
+    worker_thread_remove_timer_task(&WT, &read_timeout_task);
     update_app_info();
     command_boot_if_app_valid(SHARED_BOOT_REASON_FIRMWARE_UPDATE);
 }
