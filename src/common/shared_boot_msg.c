@@ -28,6 +28,8 @@ static int16_t get_payload_length(enum shared_msg_t msgid) {
             return sizeof(struct shared_boot_info_msg_s);
         case SHARED_MSG_CANBUS_INFO:
             return sizeof(struct shared_canbus_info_s);
+        case SHARED_MSG_BOOTLOADER_HOLD:
+            return sizeof(struct shared_bootloader_hold_msg_s);
     };
 
     return -1;
