@@ -85,6 +85,7 @@ static void on_timeout(struct worker_thread_timer_task_s* task) {
         if (uavcan_broadcast_with_callback(0, &uavcan_protocol_GlobalTimeSync_descriptor, CANARD_TRANSFER_PRIORITY_MEDIUM, &msg, LL_MS2ST(1100), &msg_completion_topic)) {
             transmit_init_us64 = micros64();
         } else {
+            last_failed_transmit_us64 = micros64();
             worker_thread_timer_task_reschedule(&WT, &timer_task, LL_MS2ST(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS));
         }
     } else if (mode == MASTER) {
@@ -98,6 +99,7 @@ static void on_timeout(struct worker_thread_timer_task_s* task) {
         if (uavcan_broadcast_with_callback(0, &uavcan_protocol_GlobalTimeSync_descriptor, CANARD_TRANSFER_PRIORITY_MEDIUM, &msg, LL_MS2ST(1100), &msg_completion_topic)) {
             transmit_init_us64 = micros64();
         } else {
+            last_failed_transmit_us64 = micros64();
             worker_thread_timer_task_reschedule(&WT, &timer_task, LL_MS2ST(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS));
         }
     } else if (mode == SLAVE) {
