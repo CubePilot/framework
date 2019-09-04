@@ -21,7 +21,11 @@ WORKER_THREAD_DECLARE_EXTERN(WT_TRX)
 WORKER_THREAD_DECLARE_EXTERN(WT_EXPIRE)
 
 #ifndef CAN_TX_QUEUE_LEN
-#define CAN_TX_QUEUE_LEN 64
+#  ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+#    define CAN_TX_QUEUE_LEN 128
+#  else
+#    define CAN_TX_QUEUE_LEN 64
+#   endif
 #endif
 
 #define MAX_NUM_TX_MAILBOXES 3
@@ -54,12 +58,12 @@ struct can_instance_s {
 
     memory_pool_t frame_pool;
     struct can_tx_queue_s tx_queue;
-
     struct pubsub_topic_s rx_topic;
 
     struct worker_thread_publisher_task_s rx_publisher_task;
 
 #ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+    size_t frame_pool_freecount;
     bool loopback_immediate;
     struct worker_thread_publisher_task_s loopback_publisher_task;
 #endif
@@ -235,6 +239,9 @@ struct can_tx_frame_s* can_allocate_tx_frame_and_append_I(struct can_instance_s*
     if (!new_frame) {
         return NULL;
     }
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+    instance->frame_pool_freecount--;
+#endif
     
     LINKED_LIST_APPEND(struct can_tx_frame_s, *frame_list, new_frame);
 
@@ -301,7 +308,12 @@ void can_enqueue_tx_frames(struct can_instance_s* instance, struct can_tx_frame_
 #endif
 
     // If not started or in silent mode, fail immediately
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+    // Also if the bridge interface is in use, reserve half the transmit queue for allocation
+    if (!instance->started || instance->silent || instance->frame_pool_freecount < CAN_TX_QUEUE_LEN/2) {
+#else
     if (!instance->started || instance->silent) {
+#endif
         if (completion_topic) {
             struct can_transmit_completion_msg_s msg = { t_now, false };
             pubsub_publish_message(completion_topic, sizeof(struct can_transmit_completion_msg_s), pubsub_copy_writer_func, &msg);
@@ -343,6 +355,9 @@ void can_free_tx_frames(struct can_instance_s* instance, struct can_tx_frame_s**
     
     for (struct can_tx_frame_s* frame = *frame_list; frame != NULL; frame = frame->next) {
         chPoolFree(&instance->frame_pool, frame);
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+        instance->frame_pool_freecount++;
+#endif
     }
     
     *frame_list = NULL;
@@ -371,7 +386,10 @@ struct can_instance_s* can_driver_register(uint8_t can_idx, void* driver_ctx, co
     if (!instance) {
         return NULL;
     }
-    
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+    instance->frame_pool_freecount--;
+#endif
+
     void* tx_queue_mem = chCoreAlloc(CAN_TX_QUEUE_LEN*sizeof(struct can_tx_frame_s));
     
     if (!tx_queue_mem) {
@@ -404,6 +422,7 @@ struct can_instance_s* can_driver_register(uint8_t can_idx, void* driver_ctx, co
     can_tx_queue_init(&instance->tx_queue);
 
     pubsub_init_topic(&instance->rx_topic, NULL); // TODO specific/configurable topic group
+
     worker_thread_add_publisher_task(&WT_TRX, &instance->rx_publisher_task, sizeof(struct can_rx_frame_s), num_rx_mailboxes*rx_fifo_depth);
 
 #ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
@@ -520,6 +539,9 @@ static void can_tx_frame_completed_I(struct can_instance_s* instance, struct can
         worker_thread_publisher_task_publish_I(&instance->tx_publisher_task, frame->completion_topic, sizeof(struct can_transmit_completion_msg_s), pubsub_copy_writer_func, &msg);
     }
     chPoolFreeI(&instance->frame_pool, frame);
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+    instance->frame_pool_freecount++;
+#endif
 }
 
 static void can_tx_frame_expired(struct can_instance_s* instance, struct can_tx_frame_s* frame, systime_t completion_systime) {
@@ -528,6 +550,9 @@ static void can_tx_frame_expired(struct can_instance_s* instance, struct can_tx_
         pubsub_publish_message(frame->completion_topic, sizeof(struct can_transmit_completion_msg_s), pubsub_copy_writer_func, &msg);
     }
     chPoolFree(&instance->frame_pool, frame);
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+    instance->frame_pool_freecount++;
+#endif
 }
 
 static void can_expire_handler(struct worker_thread_timer_task_s* task) {
