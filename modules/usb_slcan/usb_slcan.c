@@ -30,6 +30,7 @@ struct slcan_instance_s {
     bool timestamp_enable;
     bool flags_enable;
     bool ignore_next_frame;
+    bool loopback_enable;
 
     char cmd_buf[28];
     size_t cmd_buf_len;
@@ -45,7 +46,8 @@ RUN_AFTER(CAN_INIT) {
 
     instance.can_instance = can_get_instance(0);
     instance.timestamp_enable = true;
-    instance.flags_enable = true;
+    instance.flags_enable = false;
+    instance.loopback_enable = false;
 
     worker_thread_add_timer_task(&WT, &usb_connect_timer_task, usb_connect_timer_task_func, &instance, LL_S2ST(1), false);
     worker_thread_add_timer_task(&WT, &usb_rx_timer_task, usb_rx_timer_task_func, &instance, LL_MS2ST(1), true);
@@ -71,9 +73,6 @@ static void process_slcan_cmd(struct slcan_instance_s* instance, size_t cmd_len)
     // Unsupported commands that are just ACKed
     switch(instance->cmd_buf[0]) {
         case 'S': // Set bitrate
-        case 'O': // Open CAN channel in normal mode
-        case 'L': // Open CAN channel in silent mode
-        case 'l': // Open CAN channel in normal mode with loopback enabled
         case 'C': // Close CAN channel
         case 'M':
         case 'm': {
@@ -84,6 +83,21 @@ static void process_slcan_cmd(struct slcan_instance_s* instance, size_t cmd_len)
     // Other relevant commands that are supported by Zubax Babel and we ignore (but might be supported later):
     // 'Z' - enable or disable timestamping
     // 'F' - get and clear status flags
+
+    switch(instance->cmd_buf[0]) {
+        case 'L': { // Open CAN channel in silent mode
+            instance->loopback_enable = false;
+            return;
+        }
+        case 'O': { // Open CAN channel in normal mode
+            instance->loopback_enable = false;
+            return;
+        }
+        case 'l': {
+            instance->loopback_enable = true;
+            return;
+        }
+    }
 
     if (instance->cmd_buf[0] == 'T' || instance->cmd_buf[0] == 't' || instance->cmd_buf[0] == 'R' || instance->cmd_buf[0] == 'r') {
         // transmit command
@@ -220,6 +234,10 @@ static void can_rx_listener_task_func(size_t buf_size, const void* buf, void* ct
     const struct can_rx_frame_s* rx_frame = buf;
 
     const struct can_frame_s* frame = &rx_frame->content;
+
+    if (!instance->loopback_enable && rx_frame->origin == CAN_FRAME_ORIGIN_BRIDGE) {
+        return;
+    }
 
     const char *hex = "0123456789ABCDEF";
 
