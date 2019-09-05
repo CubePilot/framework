@@ -312,15 +312,6 @@ static void __attribute__((optimize("O3"))) uavcan_transmit_chunk_handler(uint8_
         return;
     }
 
-    if (!tx_state->frame_list_tail) {
-        tx_state->frame_list_tail = can_allocate_tx_frame_and_append(tx_state->instance->can_instance, &tx_state->frame_list_head);
-        if (!tx_state->frame_list_tail) {
-            tx_state->failed = true;
-            return;
-        }
-        memset(tx_state->frame_list_tail->content.data, 0, 8);
-    }
-
     size_t chunk_bit_ofs = 0;
 
     while (chunk_bit_ofs < bitlen) {
@@ -370,6 +361,14 @@ static bool _uavcan_send(struct uavcan_instance_s* instance, const struct uavcan
     struct uavcan_transmit_state_s tx_state = {
         false, instance, NULL, NULL, 0
     };
+
+
+    tx_state.frame_list_tail = can_allocate_tx_frame_and_append(instance->can_instance, &tx_state.frame_list_head);
+    if (!tx_state.frame_list_tail) {
+        return false;
+    }
+    memset(tx_state.frame_list_tail->content.data, 0, 8);
+    tx_state.frame_list_tail->content.DLC = 1;
 
     msg_descriptor->serializer_func(msg_data, uavcan_transmit_chunk_handler, &tx_state);
     if (tx_state.failed || !tx_state.frame_list_head) {
