@@ -30,7 +30,9 @@
 #define UAVCAN_CANARD_MEMORY_POOL_SIZE 768
 #endif
 
-#ifndef UAVCAN_TRANSFER_ID_MAP_WORKING_AREA_SIZE
+#ifdef UAVCAN_LARGE_TRANSFER_ID_MAP
+#define UAVCAN_TRANSFER_ID_MAP_WORKING_AREA_SIZE 635
+#else
 #define UAVCAN_TRANSFER_ID_MAP_WORKING_AREA_SIZE 128
 #endif
 
@@ -349,7 +351,7 @@ static void __attribute__((optimize("O3"))) uavcan_transmit_chunk_handler(uint8_
 }
 
 static bool _uavcan_send(struct uavcan_instance_s* instance, const struct uavcan_message_descriptor_s* const msg_descriptor, uint16_t data_type_id, uint8_t priority, uint8_t transfer_id, uint8_t dest_node_id, void* msg_data, systime_t timeout, struct pubsub_topic_s* completion_topic) {
-    if (!instance || !msg_descriptor || !msg_descriptor->serializer_func || !msg_data) {
+    if (!instance || !msg_descriptor || !msg_descriptor->serializer_func) {
         return false;
     }
 
