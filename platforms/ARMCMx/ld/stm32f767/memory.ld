@@ -1,12 +1,12 @@
 MEMORY
 {
-    bl_lma (rx) :         ORIGIN = 0x08000000,            LENGTH = 32K
-    bl (rx) :             ORIGIN = 0x00200000,            LENGTH = 32K
-    param1 (rx) :         ORIGIN = 0x08000000+32K,        LENGTH = 32K
-    param2 (rx) :         ORIGIN = 0x08000000+64K,        LENGTH = 32K
+    bl_lma (rx) :         ORIGIN = 0x08000000,            LENGTH = 64K
+    bl (rx) :             ORIGIN = 0x00200000,            LENGTH = 64K
+    param1 (rx) :         ORIGIN = 0x08000000+64K,        LENGTH = 32K
+    param2 (rx) :         ORIGIN = 0x08000000+96K,        LENGTH = 32K
 
-    app_lma (rx) :        ORIGIN = 0x08000000+96K,        LENGTH = 2M-96K
-    app (rx) :            ORIGIN = 0x00200000+96K,        LENGTH = 2M-96K
+    app_lma (rx) :        ORIGIN = 0x08000000+128K,        LENGTH = 2M-128K
+    app (rx) :            ORIGIN = 0x00200000+128K,        LENGTH = 2M-128K
 
     ram0    : org = 0x20020000, len = 384k-256      /* SRAM1 + SRAM2 */
     ram1    : org = 0x20020000, len = 368k      /* SRAM1 */
