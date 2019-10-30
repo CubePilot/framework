@@ -2,6 +2,8 @@
 #include <hal.h>
 #include <modules/can/can_driver.h>
 
+#if defined(STM32F4) || defined(STM32F7)
+
 #if !defined(CAN1) && defined(CAN)
 #define CAN1 CAN
 #endif
@@ -262,3 +264,6 @@ OSAL_IRQ_HANDLER(STM32_CAN1_RX0_HANDLER) {
 
     OSAL_IRQ_EPILOGUE();
 }
+
+#endif //#if defined(STM32F4) || defined(STM32F7)
+
