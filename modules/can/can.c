@@ -539,10 +539,11 @@ static void can_try_enqueue_waiting_frame_I(struct can_instance_s* instance) {
     
     struct can_tx_frame_s* frame = can_tx_queue_peek_I(&instance->tx_queue);
     if (frame && (!have_pending_mailbox || can_get_tx_frame_priority_X(frame) > highest_prio_pending)) {
-        can_tx_queue_pop_I(&instance->tx_queue);
-        instance->tx_mailbox[empty_mailbox_idx].frame = frame;
-        instance->tx_mailbox[empty_mailbox_idx].state = CAN_TX_MAILBOX_PENDING;
-        instance->driver_iface->load_tx_mailbox_I(instance->driver_ctx, empty_mailbox_idx, &frame->content);
+        if (instance->driver_iface->load_tx_mailbox_I(instance->driver_ctx, empty_mailbox_idx, &frame->content)) {
+            can_tx_queue_pop_I(&instance->tx_queue);
+            instance->tx_mailbox[empty_mailbox_idx].frame = frame;
+            instance->tx_mailbox[empty_mailbox_idx].state = CAN_TX_MAILBOX_PENDING;
+        }
     }
 }
 
