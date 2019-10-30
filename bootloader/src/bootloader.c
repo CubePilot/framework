@@ -206,12 +206,14 @@ static void file_read_response_handler(size_t msg_size, const void* buf, void* c
                 erase_app_page(i);
             }
         }
-        struct flash_write_buf_s buf = {res->data_len, (void*)res->data};
-        flash_write((void*)get_app_address_from_ofs(flash_state.ofs), 1, &buf);
 
         if (res->data_len < 256) {
+            struct flash_write_buf_s buf = {((res->data_len/FLASH_WORD_SIZE) + 1) * FLASH_WORD_SIZE, (void*)res->data};
+            flash_write((void*)get_app_address_from_ofs(flash_state.ofs), 1, &buf);
             on_update_complete();
         } else {
+            struct flash_write_buf_s buf = {res->data_len, (void*)res->data};
+            flash_write((void*)get_app_address_from_ofs(flash_state.ofs), 1, &buf);
             flash_state.ofs += res->data_len;
             do_send_read_request();
         }
