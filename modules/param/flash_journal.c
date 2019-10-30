@@ -2,7 +2,7 @@
 #include <modules/flash/flash.h>
 #include <common/helpers.h>
 
-#define FLASH_JOURNAL_ALIGNMENT 2
+#define FLASH_JOURNAL_ALIGNMENT FLASH_WORD_SIZE
 #define FLASH_JOURNAL_ENTRY_HEADER_SIZE sizeof(struct flash_journal_entry_s)
 
 static uint16_t flash_journal_entry_compute_crc16(const struct flash_journal_entry_s* entry);
