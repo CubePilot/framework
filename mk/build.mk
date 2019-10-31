@@ -136,26 +136,17 @@ include $(CHIBIOS)/os/rt/rt.mk
 include $(CHIBIOS)/os/hal/lib/streams/streams.mk
 
 INCDIR += $(CHIBIOS)/os/license \
-          $(STARTUPINC) $(KERNINC) $(PORTINC) $(OSALINC) \
-          $(HALINC) $(PLATFORMINC) $(BOARD_INC) $(TESTINC)$(STREAMSINC) \
-          $(CHIBIOS)/community/os/various \
-          $(CHIBIOS)/os/various \
+          $(BOARD_INC)\
+          $(ALLINC) \
           $(COMMON_INC) \
           $(BUILDDIR)/modules
 
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
-CSRC += $(STARTUPSRC) \
-        $(KERNSRC) \
-        $(PORTSRC) \
-        $(OSALSRC) \
-        $(HALSRC) \
-        $(PLATFORMSRC) \
+CSRC += $(ALLCSRC) \
         $(BOARD_SRC) \
-        $(TESTSRC) \
         $(COMMON_CSRC) \
-        $(MODULES_CSRC) \
-        $(STREAMSSRC)
+        $(MODULES_CSRC)
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -240,3 +231,4 @@ $(MODULE_COPY_DIRS):
 	cp -R -p $(wildcard $(addsuffix /$(patsubst $(MODULES_ENABLED_DIR)/%,%,$@),$(MODULE_SEARCH_DIRS))) $@
 
 $(CSRC): $(MODULE_COPY_DIRS)
+$(ASMXSRC): $(MODULE_COPY_DIRS)

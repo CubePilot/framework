@@ -32,6 +32,7 @@
  */
 
 #define STM32F7xx_MCUCONF
+#define STM32F767_MCUCONF
 
 #define STM32_LSECLK                0U
 #define STM32_LSEDRV                (3U << 3U)

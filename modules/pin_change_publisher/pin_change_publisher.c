@@ -35,7 +35,7 @@ RUN_ON(PUBSUB_TOPIC_INIT) {
     worker_thread_add_publisher_task(&WT, &publisher_task, sizeof(struct pin_change_msg_s), PIN_CHANGE_PUBLISHER_QUEUE_DEPTH);
 }
 
-MEMORYPOOL_DECL(pin_change_publisher_topic_list_pool, sizeof(struct pin_change_publisher_topic_s), chCoreAllocAlignedI);
+MEMORYPOOL_DECL(pin_change_publisher_topic_list_pool, sizeof(struct pin_change_publisher_topic_s), PORT_NATURAL_ALIGN, chCoreAllocAlignedI);
 
 static struct pin_change_publisher_topic_s* pin_change_publisher_find_irq_topic(expchannel_t channel);
 static void pin_change_publisher_common_handler(EXTDriver *extp, expchannel_t channel);
