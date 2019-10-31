@@ -56,6 +56,7 @@
     } \
 }
 
+char ascii_toupper(char c);
 
 float sinf_fast(float x);
 float cosf_fast(float x);

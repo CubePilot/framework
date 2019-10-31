@@ -17,6 +17,13 @@
 #include <math.h>
 #include <stdint.h>
 
+char ascii_toupper(char c) {
+    if (c >= 'a' && c <= 'z') {
+        c -= 'a'-'A';
+    }
+    return c;
+}
+
 float wrap_1(float x) {
     volatile float z = (x + 25165824.0f);
     x = x - (z - 25165824.0f);
