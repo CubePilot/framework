@@ -1,6 +1,7 @@
 #include <modules/can/can.h>
 #include <modules/worker_thread/worker_thread.h>
 #include <modules/timing/timing.h>
+#include <common/helpers.h>
 #include <common/ctor.h>
 #include "usbcfg.h"
 #include <hal.h>
@@ -62,7 +63,7 @@ static void usb_connect_timer_task_func(struct worker_thread_timer_task_s* task)
 
 static uint8_t hex_to_nibble(char c) {
     const char* hex_chars = "0123456789ABCDEF";
-    const char* chrptr = strchr(hex_chars, toupper(c));
+    const char* chrptr = strchr(hex_chars, ascii_toupper(c));
     if (!chrptr) {
         return 255;
     }
@@ -251,7 +252,7 @@ static void can_rx_listener_task_func(size_t buf_size, const void* buf, void* ct
     }
 
     if (frame->IDE) {
-        slcan_frame[0] = toupper(slcan_frame[0]);
+        slcan_frame[0] = ascii_toupper(slcan_frame[0]);
         for (uint8_t i=0; i<8; i++) {
             slcan_frame[slcan_frame_len++] = hex[(frame->EID >> ((7-i)*4))&0xf];
         }
