@@ -13,7 +13,7 @@ static uint8_t icm20x48_get_whoami(enum icm20x48_imu_type_t imu_type);
 
 bool icm20x48_init(struct icm20x48_instance_s* instance, uint8_t spi_idx, uint32_t select_line, enum icm20x48_imu_type_t imu_type) {
     // Ensure sufficient power-up time has elapsed
-    chThdSleep(LL_MS2ST(100));
+    chThdSleep(chTimeMS2I(100));
 
     instance->curr_bank = 99;
 
@@ -25,11 +25,11 @@ bool icm20x48_init(struct icm20x48_instance_s* instance, uint8_t spi_idx, uint32
 
     // Read USER_CTRL, disable MST_I2C, write USER_CTRL, and wait long enough for any active I2C transaction to complete
     icm20x48_write_reg(instance, ICM20948_REG_USER_CTRL,  icm20x48_read_reg(instance, ICM20948_REG_USER_CTRL) & ~(1<<5));
-    chThdSleep(LL_MS2ST(10));
+    chThdSleep(chTimeMS2I(10));
     // Perform a device reset, wait for completion, then wake the device
     // Datasheet is unclear on time required for wait time after reset, but mentions 100ms under "start-up time for register read/write from power-up"
     icm20x48_write_reg(instance, ICM20948_REG_PWR_MGMT_1, 1<<7);
-    chThdSleep(LL_MS2ST(100));
+    chThdSleep(chTimeMS2I(100));
 
     icm20x48_write_reg(instance, ICM20948_REG_PWR_MGMT_1, 1);
     // Wait for reset to complete
@@ -37,13 +37,13 @@ bool icm20x48_init(struct icm20x48_instance_s* instance, uint8_t spi_idx, uint32
         uint32_t tbegin = chVTGetSystemTimeX();
         while (icm20x48_read_reg(instance, ICM20948_REG_PWR_MGMT_1) & 1<<7) {
             uint32_t tnow = chVTGetSystemTimeX();
-            if (tnow-tbegin > LL_MS2ST(100)) {
+            if (tnow-tbegin > chTimeMS2I(100)) {
                 return false;
             }
         }
     }
 
-    chThdSleep(LL_MS2ST(10));
+    chThdSleep(chTimeMS2I(10));
 
     return true;
 }

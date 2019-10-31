@@ -29,7 +29,7 @@ static struct worker_thread_timer_task_s stack_print_task;
 static void stack_print_task_func(struct worker_thread_timer_task_s* task);
 
 RUN_AFTER(WORKER_THREADS_INIT) {
-    worker_thread_add_timer_task(&WT, &stack_print_task, stack_print_task_func, NULL, LL_S2ST(5), false);
+    worker_thread_add_timer_task(&WT, &stack_print_task, stack_print_task_func, NULL, chTimeS2I(5), false);
 }
 
 extern uint8_t __process_stack_base__;
@@ -73,5 +73,5 @@ static void stack_print_task_func(struct worker_thread_timer_task_s* task) {
     }
     print_exception_free_stack();
 
-    worker_thread_timer_task_reschedule(&WT, &stack_print_task, LL_S2ST(60));
+    worker_thread_timer_task_reschedule(&WT, &stack_print_task, chTimeS2I(60));
 }

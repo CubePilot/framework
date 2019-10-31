@@ -745,7 +745,7 @@ float dw1000_get_temp(struct dw1000_instance_s* instance) {
     dw1000_write8(instance, 0x28, 0x12, 0x0A);
     dw1000_write8(instance, 0x28, 0x12, 0x0F);
     dw1000_write8(instance, 0x2A, 0x00, 0x01);
-    chThdSleep(LL_US2ST(10));
+    chThdSleep(chTimeUS2I(10));
     dw1000_write8(instance, 0x2A, 0x00, 0x00);
     uint8_t sarl_value[2] = {};
     dw1000_read(instance, 0x2A, 0x03, 2, sarl_value);
