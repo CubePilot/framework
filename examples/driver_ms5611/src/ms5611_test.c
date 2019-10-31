@@ -25,7 +25,7 @@ RUN_AFTER(INIT_END) {
         }
         usleep(10000);
     }
-    worker_thread_add_timer_task(&WT, &ms5611_task, ms5611_task_func, NULL, MS2ST(10), true);
+    worker_thread_add_timer_task(&WT, &ms5611_task, ms5611_task_func, NULL, chTimeMS2I(10), true);
 }
 
 static void ms5611_task_func(struct worker_thread_timer_task_s* task) {

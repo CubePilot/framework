@@ -1,6 +1,5 @@
 #pragma once
 
-#include <stdint.h>
 #include <modules/platform_stm32f767/platform_stm32f767.h>
 
 #define BOARD_CONFIG_HW_NAME "com.hex.here_pro"
