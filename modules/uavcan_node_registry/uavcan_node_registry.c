@@ -130,7 +130,7 @@ static void nodeinfo_res_listener_task_func(size_t msg_size, const void* buf, vo
 
 static uint8_t hex_to_nibble(char c) {
     const char* hex_chars = "0123456789ABCDEF";
-    const char* chrptr = strchr(hex_chars, toupper(c));
+    const char* chrptr = strchr(hex_chars, ascii_toupper(c));
     if (!chrptr) {
         return 255;
     }
