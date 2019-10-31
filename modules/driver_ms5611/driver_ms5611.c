@@ -30,20 +30,20 @@ void ms5611_init(struct ms5611_instance_s* instance, uint8_t spi_idx, uint32_t s
     instance->worker_thread = worker_thread;
 
     // Ensure sufficient power-up time has elapsed
-    chThdSleep(LL_MS2ST(100));
+    chThdSleep(chTimeMS2I(100));
 
     spi_device_init(&instance->spi_dev, spi_idx, select_line, 20000000, 8, SPI_DEVICE_FLAG_CPHA|SPI_DEVICE_FLAG_CPOL);
 
     // Reset device
     ms5611_cmd(instance, MS5611_CMD_RESET);
 
-    chThdSleep(LL_MS2ST(20));
+    chThdSleep(chTimeMS2I(20));
 
     ms5611_read_prom(instance);
 
     instance->process_step = 0;
     ms5611_cmd(instance, MS5611_CMD_CVT_D2_1024);
-    worker_thread_add_timer_task(instance->worker_thread, &instance->task, ms5611_task_func, instance, LL_US2ST(2500), false);
+    worker_thread_add_timer_task(instance->worker_thread, &instance->task, ms5611_task_func, instance, chTimeUS2I(2500), false);
 }
 
 static void ms5611_task_func(struct worker_thread_timer_task_s* task) {
@@ -55,7 +55,7 @@ static void ms5611_task_func(struct worker_thread_timer_task_s* task) {
             instance->D2 = ms5611_read_adc(instance);
             ms5611_cmd(instance, MS5611_CMD_CVT_D1_1024);
             instance->conversion_start_time = chVTGetSystemTimeX();
-            worker_thread_add_timer_task(instance->worker_thread, &instance->task, ms5611_task_func, instance, LL_US2ST(2500), false);
+            worker_thread_add_timer_task(instance->worker_thread, &instance->task, ms5611_task_func, instance, chTimeUS2I(2500), false);
             break;
         }
         case 1: {
@@ -69,7 +69,7 @@ static void ms5611_task_func(struct worker_thread_timer_task_s* task) {
                 ms5611_compute_temperature_and_pressure(instance, &sample.pressure_pa, &sample.temperature_K);
                 pubsub_publish_message(instance->topic, sizeof(sample), pubsub_copy_writer_func, &sample);
             }
-            worker_thread_timer_task_reschedule(instance->worker_thread, &instance->task, LL_MS2ST(17));
+            worker_thread_timer_task_reschedule(instance->worker_thread, &instance->task, chTimeMS2I(17));
             break;
         }
     }

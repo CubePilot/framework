@@ -93,13 +93,13 @@ VL53L1_Error VL53L1_RdWord(VL53L1_DEV dev, uint16_t index, uint16_t *data) {
 
 VL53L1_Error VL53L1_WaitMs(VL53L1_Dev_t *pdev, int32_t wait_ms){
     (void)pdev;
-    chThdSleep(LL_MS2ST(wait_ms));
+    chThdSleep(chTimeMS2I(wait_ms));
     return VL53L1_ERROR_NONE;
 }
 
 VL53L1_Error VL53L1_WaitUs(VL53L1_Dev_t *pdev, int32_t wait_us){
     (void)pdev;
-    chThdSleep(LL_US2ST(wait_us));
+    chThdSleep(chTimeUS2I(wait_us));
     return VL53L1_ERROR_NONE;
 }
 

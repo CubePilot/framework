@@ -9,6 +9,8 @@ boot_msg \
 timing \
 system \
 pubsub \
+param \
+flash \
 worker_thread \
 can_driver_stm32 \
 can \

@@ -1,9 +1,11 @@
 #pragma once
 
-#include <modules/platform_stm32f767/platform_stm32f767.h>
+#include <modules/platform_stm32h743/platform_stm32h743.h>
+
+#define BOARD_FLASH_SIZE 2048
 
 #define BOARD_CONFIG_HW_NAME "com.hex.here_pro"
-#define BOARD_CONFIG_HW_MAJOR_VER 1
+#define BOARD_CONFIG_HW_MAJOR_VER 2
 #define BOARD_CONFIG_HW_MINOR_VER 0
 
 #define BOARD_CONFIG_HW_INFO_STRUCTURE { \
@@ -45,3 +47,4 @@
 #define BOARD_PAL_LINE_CAN1_RX PAL_LINE(GPIOB,8)
 #define BOARD_PAL_LINE_CAN1_TX PAL_LINE(GPIOB,9)
 #define BOARD_FLASH_SIZE 2048
+

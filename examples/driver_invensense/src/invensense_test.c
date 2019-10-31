@@ -12,7 +12,7 @@ static void invensense_test_task_func(struct worker_thread_timer_task_s* task);
 
 RUN_AFTER(INIT_END) {
     invensense_init(&invensense, 3, BOARD_PAL_LINE_SPI3_ICM_CS, INVENSENSE_IMU_TYPE_ICM20602);
-    worker_thread_add_timer_task(&WT, &invensense_test_task, invensense_test_task_func, NULL, MS2ST(1), true);
+    worker_thread_add_timer_task(&WT, &invensense_test_task, invensense_test_task_func, NULL, chTimeMS2I(1), true);
 }
 
 static struct {

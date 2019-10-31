@@ -2,6 +2,8 @@
 #include <hal.h>
 #include <modules/can/can_driver.h>
 
+#if defined(STM32F4) || defined(STM32F7)
+
 #if !defined(CAN1) && defined(CAN)
 #define CAN1 CAN
 #endif
@@ -131,7 +133,7 @@ static void can_driver_stm32_stop(void* ctx) {
     nvicDisableVector(STM32_CAN1_RX0_NUMBER);
     nvicDisableVector(STM32_CAN1_SCE_NUMBER);
 
-    rccDisableCAN1(FALSE);
+    rccDisableCAN1();
 }
 
 bool can_driver_stm32_abort_tx_mailbox_I(void* ctx, uint8_t mb_idx) {
@@ -262,3 +264,6 @@ OSAL_IRQ_HANDLER(STM32_CAN1_RX0_HANDLER) {
 
     OSAL_IRQ_EPILOGUE();
 }
+
+#endif //#if defined(STM32F4) || defined(STM32F7)
+

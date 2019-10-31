@@ -171,7 +171,7 @@ static void begin_flash_from_path(uint8_t uavcan_idx, uint8_t source_node_id, co
     flash_state.source_node_id = source_node_id;
     flash_state.uavcan_idx = uavcan_idx;
     strncpy(flash_state.path, path, 200);
-    worker_thread_add_timer_task(&WT, &read_timeout_task, read_request_response_timeout, NULL, LL_MS2ST(500), false);
+    worker_thread_add_timer_task(&WT, &read_timeout_task, read_request_response_timeout, NULL, chTimeMS2I(500), false);
     do_send_read_request();
 
     corrupt_app();
@@ -201,12 +201,14 @@ static void file_read_response_handler(size_t msg_size, const void* buf, void* c
                 erase_app_page(i);
             }
         }
-        struct flash_write_buf_s buf = {res->data_len, (void*)res->data};
-        flash_write((void*)get_app_address_from_ofs(flash_state.ofs), 1, &buf);
 
         if (res->data_len < 256) {
+            struct flash_write_buf_s buf = {((res->data_len/FLASH_WORD_SIZE) + 1) * FLASH_WORD_SIZE, (void*)res->data};
+            flash_write((void*)get_app_address_from_ofs(flash_state.ofs), 1, &buf);
             on_update_complete();
         } else {
+            struct flash_write_buf_s buf = {res->data_len, (void*)res->data};
+            flash_write((void*)get_app_address_from_ofs(flash_state.ofs), 1, &buf);
             flash_state.ofs += res->data_len;
             do_send_read_request();
         }
@@ -219,7 +221,7 @@ static void do_resend_read_request(void) {
     strncpy((char*)read_req.path.path,flash_state.path,sizeof(read_req.path));
     read_req.path.path_len = strnlen(flash_state.path,sizeof(read_req.path));
     uavcan_request(flash_state.uavcan_idx, &uavcan_protocol_file_Read_req_descriptor, CANARD_TRANSFER_PRIORITY_HIGH, flash_state.source_node_id, &read_req);
-    worker_thread_timer_task_reschedule(&WT, &read_timeout_task, LL_MS2ST(500));
+    worker_thread_timer_task_reschedule(&WT, &read_timeout_task, chTimeMS2I(500));
     flash_state.retries++;
 }
 
@@ -341,7 +343,7 @@ static void check_and_start_boot_timer(void) {
         return;
     }
 
-    start_boot_timer(LL_S2ST((uint32_t)app_info.shared_app_parameters->boot_delay_sec));
+    start_boot_timer(chTimeS2I((uint32_t)app_info.shared_app_parameters->boot_delay_sec));
 }
 
 static void erase_app_page(uint32_t page_num) {
@@ -390,7 +392,7 @@ static void restart_req_handler(size_t msg_size, const void* buf, void* ctx) {
 
     if ((msg->magic_number == UAVCAN_PROTOCOL_RESTARTNODE_REQ_MAGIC_NUMBER) && system_get_restart_allowed()) {
         res.ok = true;
-        worker_thread_add_timer_task(&WT, &delayed_restart_task, delayed_restart_func, NULL, LL_MS2ST(1000), false);
+        worker_thread_add_timer_task(&WT, &delayed_restart_task, delayed_restart_func, NULL, chTimeMS2I(1000), false);
     }
 
     uavcan_respond(msg_wrapper->uavcan_idx, msg_wrapper, &res);
