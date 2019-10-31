@@ -23,7 +23,7 @@ struct gps_msg_publisher_topic_s {
 
 
 static struct gps_msg_publisher_topic_s *gps_msg_topic_list_head;
-MEMORYPOOL_DECL(gps_msg_publisher_topic_list_pool, sizeof(struct gps_msg_publisher_topic_s), chCoreAllocAlignedI);
+MEMORYPOOL_DECL(gps_msg_publisher_topic_list_pool, sizeof(struct gps_msg_publisher_topic_s), PORT_NATURAL_ALIGN, chCoreAllocAlignedI);
 
 bool gps_ubx_init_msg_topic(struct gps_handle_s* gps_handle, uint8_t class_id, uint8_t msg_id, void* frame_buffer, size_t frame_buffer_len, struct pubsub_topic_s* topic)
 {

@@ -37,7 +37,7 @@ static struct worker_thread_timer_task_s timing_state_update_task;
 static void timing_state_update_task_func(struct worker_thread_timer_task_s* task);
 
 RUN_AFTER(WORKER_THREADS_INIT) {
-    worker_thread_add_timer_task(&WT, &timing_state_update_task, timing_state_update_task_func, NULL, LL_S2ST(10), true);
+    worker_thread_add_timer_task(&WT, &timing_state_update_task, timing_state_update_task_func, NULL, chTimeS2I(10), true);
 }
 
 uint32_t millis(void) {

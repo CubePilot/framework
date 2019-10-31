@@ -131,7 +131,7 @@ static void can_driver_stm32_stop(void* ctx) {
     nvicDisableVector(STM32_CAN1_RX0_NUMBER);
     nvicDisableVector(STM32_CAN1_SCE_NUMBER);
 
-    rccDisableCAN1(FALSE);
+    rccDisableCAN1();
 }
 
 bool can_driver_stm32_abort_tx_mailbox_I(void* ctx, uint8_t mb_idx) {

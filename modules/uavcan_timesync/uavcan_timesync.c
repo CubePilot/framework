@@ -73,7 +73,7 @@ RUN_AFTER(UAVCAN_INIT) {
     worker_thread_add_listener_task(&WT, &timesync_tx_completion_listener, &msg_completion_topic, timesync_tx_completion_handler, NULL);
 
     last_failed_transmit_us64 = micros64();
-    worker_thread_timer_task_reschedule(&WT, &timer_task, LL_MS2ST(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS));
+    worker_thread_timer_task_reschedule(&WT, &timer_task, chTimeMS2I(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS));
 }
 
 static void on_timeout(struct worker_thread_timer_task_s* task) {
@@ -82,11 +82,11 @@ static void on_timeout(struct worker_thread_timer_task_s* task) {
     if (mode == MASTER_INIT) {
         struct uavcan_protocol_GlobalTimeSync_s msg;
         msg.previous_transmission_timestamp_usec = 0;
-        if (uavcan_broadcast_with_callback(0, &uavcan_protocol_GlobalTimeSync_descriptor, CANARD_TRANSFER_PRIORITY_MEDIUM, &msg, LL_MS2ST(1100), &msg_completion_topic)) {
+        if (uavcan_broadcast_with_callback(0, &uavcan_protocol_GlobalTimeSync_descriptor, CANARD_TRANSFER_PRIORITY_MEDIUM, &msg, chTimeMS2I(1100), &msg_completion_topic)) {
             transmit_init_us64 = micros64();
         } else {
             last_failed_transmit_us64 = micros64();
-            worker_thread_timer_task_reschedule(&WT, &timer_task, LL_MS2ST(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS));
+            worker_thread_timer_task_reschedule(&WT, &timer_task, chTimeMS2I(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS));
         }
     } else if (mode == MASTER) {
         struct uavcan_protocol_GlobalTimeSync_s msg;
@@ -96,11 +96,11 @@ static void on_timeout(struct worker_thread_timer_task_s* task) {
             msg.previous_transmission_timestamp_usec = last_transmit_time_us64;
         }
         last_transmit_time_us64 = 0;
-        if (uavcan_broadcast_with_callback(0, &uavcan_protocol_GlobalTimeSync_descriptor, CANARD_TRANSFER_PRIORITY_MEDIUM, &msg, LL_MS2ST(1100), &msg_completion_topic)) {
+        if (uavcan_broadcast_with_callback(0, &uavcan_protocol_GlobalTimeSync_descriptor, CANARD_TRANSFER_PRIORITY_MEDIUM, &msg, chTimeMS2I(1100), &msg_completion_topic)) {
             transmit_init_us64 = micros64();
         } else {
             last_failed_transmit_us64 = micros64();
-            worker_thread_timer_task_reschedule(&WT, &timer_task, LL_MS2ST(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS));
+            worker_thread_timer_task_reschedule(&WT, &timer_task, chTimeMS2I(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS));
         }
     } else if (mode == SLAVE) {
         // transition to MASTER_INIT
@@ -120,7 +120,7 @@ static void timesync_tx_completion_handler(size_t msg_size, const void* buf, voi
     if (mode == MASTER_INIT) {
         if (status->transmit_success) {
             last_transmit_time_us64 = micros64_from_systime(status->completion_systime);
-            if (last_failed_transmit_us64 != 0 && tnow_us64-last_failed_transmit_us64 > LL_MS2ST(2200)) {
+            if (last_failed_transmit_us64 != 0 && tnow_us64-last_failed_transmit_us64 > chTimeMS2I(2200)) {
                 mode = MASTER;
                 have_valid_systime_offset = true;
             }
@@ -140,11 +140,11 @@ static void timesync_tx_completion_handler(size_t msg_size, const void* buf, voi
 
     if (mode == MASTER_INIT || mode == MASTER) {
         // Reschedule
-        systime_t time_elapsed = LL_US2ST(micros64_from_systime(status->completion_systime)-transmit_init_us64);
-        if (time_elapsed >= LL_MS2ST(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS)) {
+        systime_t time_elapsed = chTimeUS2I(micros64_from_systime(status->completion_systime)-transmit_init_us64);
+        if (time_elapsed >= chTimeMS2I(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS)) {
             worker_thread_timer_task_reschedule(&WT, &timer_task, TIME_IMMEDIATE);
         } else {
-            worker_thread_timer_task_reschedule(&WT, &timer_task, LL_MS2ST(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS)-time_elapsed);
+            worker_thread_timer_task_reschedule(&WT, &timer_task, chTimeMS2I(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS)-time_elapsed);
         }
     }
 
@@ -172,11 +172,11 @@ static void timesync_message_handler(size_t msg_size, const void* buf, void* ctx
     } else if (mode == SLAVE) {
         if (msg_wrapper->source_node_id < master_node_id) {
             // reschedule timeout
-            worker_thread_timer_task_reschedule(&WT, &timer_task, LL_MS2ST(2200));
+            worker_thread_timer_task_reschedule(&WT, &timer_task, chTimeMS2I(2200));
             master_node_id = msg_wrapper->source_node_id;
         } else if (msg_wrapper->source_node_id == master_node_id) {
             // reschedule timeout
-            worker_thread_timer_task_reschedule(&WT, &timer_task, LL_MS2ST(2200));
+            worker_thread_timer_task_reschedule(&WT, &timer_task, chTimeMS2I(2200));
             // compute time offset
             if (prev_received_message_us64 != 0 && msg->previous_transmission_timestamp_usec != 0) {
                 // TODO implement some kind of jitter filter and potentially scale factor estimation
