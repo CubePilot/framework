@@ -75,7 +75,7 @@ struct can_instance_s {
     struct can_instance_s* next;
 };
 
-MEMORYPOOL_DECL(can_instance_pool, sizeof(struct can_instance_s), chCoreAllocAlignedI);
+MEMORYPOOL_DECL(can_instance_pool, sizeof(struct can_instance_s), PORT_NATURAL_ALIGN, chCoreAllocAlignedI);
 
 static struct can_instance_s* can_instance_list_head;
 

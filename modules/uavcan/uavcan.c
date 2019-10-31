@@ -91,7 +91,7 @@ static CanardCANFrame convert_can_frame_to_CanardCANFrame(const struct can_frame
 static void uavcan_transfer_id_map_init(struct transfer_id_map_s* map, size_t map_mem_size, void* map_mem);
 static uint8_t* uavcan_transfer_id_map_retrieve(struct transfer_id_map_s* map, bool service_not_message, uint16_t transfer_id, uint8_t dest_node_id);
 
-MEMORYPOOL_DECL(rx_list_pool, sizeof(struct uavcan_rx_list_item_s), chCoreAllocAlignedI);
+MEMORYPOOL_DECL(rx_list_pool, sizeof(struct uavcan_rx_list_item_s), PORT_NATURAL_ALIGN, chCoreAllocAlignedI);
 
 static void stale_transfer_cleanup_task_func(struct worker_thread_timer_task_s* task);
 static struct worker_thread_timer_task_s stale_transfer_cleanup_task;
@@ -110,7 +110,7 @@ PARAM_DEFINE_UINT8_PARAM_STATIC(node_id_param, "uavcan.node_id", APP_CONFIG_CAN_
 RUN_ON(UAVCAN_INIT) {
     uavcan_init(0);
 
-    worker_thread_add_timer_task(&WT_RX, &stale_transfer_cleanup_task, stale_transfer_cleanup_task_func, NULL, LL_US2ST(CANARD_RECOMMENDED_STALE_TRANSFER_CLEANUP_INTERVAL_USEC), true);
+    worker_thread_add_timer_task(&WT_RX, &stale_transfer_cleanup_task, stale_transfer_cleanup_task_func, NULL, chTimeUS2I(CANARD_RECOMMENDED_STALE_TRANSFER_CLEANUP_INTERVAL_USEC), true);
 }
 
 static void uavcan_init(uint8_t can_dev_idx) {
@@ -455,7 +455,7 @@ bool uavcan_broadcast_with_callback(uint8_t uavcan_idx, const struct uavcan_mess
 }
 
 bool uavcan_broadcast(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, void* msg_data) {
-    return uavcan_broadcast_with_callback(uavcan_idx, msg_descriptor, priority, msg_data, LL_S2ST(2), NULL);
+    return uavcan_broadcast_with_callback(uavcan_idx, msg_descriptor, priority, msg_data, chTimeS2I(2), NULL);
 }
 
 bool uavcan_request(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, uint8_t dest_node_id, void* msg_data) {
@@ -468,7 +468,7 @@ bool uavcan_request(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s
     chSysLock();
     uint8_t* transfer_id = uavcan_transfer_id_map_retrieve(&instance->transfer_id_map, false, data_type_id, 0);
     chSysUnlock();
-    if(_uavcan_send(instance, msg_descriptor, data_type_id, priority, *transfer_id, dest_node_id, msg_data, LL_S2ST(2), NULL)) {
+    if(_uavcan_send(instance, msg_descriptor, data_type_id, priority, *transfer_id, dest_node_id, msg_data, chTimeS2I(2), NULL)) {
         (*transfer_id)++;
         return true;
     } else {
@@ -487,7 +487,7 @@ bool uavcan_respond(uint8_t uavcan_idx, const struct uavcan_deserialized_message
     uint8_t transfer_id = req_msg->transfer_id;
     uint8_t dest_node_id = req_msg->source_node_id;
     uint16_t data_type_id = msg_descriptor->default_data_type_id;
-    return _uavcan_send(instance, msg_descriptor, data_type_id, priority, transfer_id, dest_node_id, msg_data, LL_S2ST(2), NULL);
+    return _uavcan_send(instance, msg_descriptor, data_type_id, priority, transfer_id, dest_node_id, msg_data, chTimeS2I(2), NULL);
 }
 
 static void uavcan_can_rx_handler(size_t msg_size, const void* msg, void* ctx) {

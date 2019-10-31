@@ -85,7 +85,7 @@ RUN_AFTER(CAN_INIT) {
     }
 
     if (canbus_autobaud_enable) {
-        worker_thread_add_timer_task(&WT, &autobaud_timer_task, autobaud_timer_task_func, NULL, LL_US2ST(CAN_AUTOBAUD_SWITCH_INTERVAL_US), false);
+        worker_thread_add_timer_task(&WT, &autobaud_timer_task, autobaud_timer_task_func, NULL, chTimeUS2I(CAN_AUTOBAUD_SWITCH_INTERVAL_US), false);
     }
 }
 
@@ -104,6 +104,6 @@ static void autobaud_timer_task_func(struct worker_thread_timer_task_s* task) {
     }
 
     if (!autobaud_complete) {
-        worker_thread_timer_task_reschedule(&WT, task, LL_US2ST(CAN_AUTOBAUD_SWITCH_INTERVAL_US));
+        worker_thread_timer_task_reschedule(&WT, task, chTimeUS2I(CAN_AUTOBAUD_SWITCH_INTERVAL_US));
     }
 }

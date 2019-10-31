@@ -220,7 +220,7 @@ void worker_thread_takeover(struct worker_thread_s* worker_thread) {
             chSysUnlock();
             while (task) {
                 struct worker_thread_publisher_msg_s* msg;
-                while (chMBFetch(&task->mailbox, (msg_t*)&msg, TIME_IMMEDIATE) == MSG_OK) {
+                while (chMBFetchTimeout(&task->mailbox, (msg_t*)&msg, TIME_IMMEDIATE) == MSG_OK) {
                     pubsub_publish_message(msg->topic, msg->size, pubsub_copy_writer_func, msg->data);
                     chPoolFree(&task->pool, msg);
                 }
