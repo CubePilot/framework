@@ -387,7 +387,7 @@ struct can_instance_s* can_driver_register(uint8_t can_idx, void* driver_ctx, co
         return NULL;
     }
 #ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
-    instance->frame_pool_freecount--;
+    instance->frame_pool_freecount = CAN_TX_QUEUE_LEN;
 #endif
 
     void* tx_queue_mem = chCoreAlloc(CAN_TX_QUEUE_LEN*sizeof(struct can_tx_frame_s));
