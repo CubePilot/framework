@@ -42,6 +42,7 @@ static struct {
     uint32_t ofs;
     uint32_t app_start_ofs;
     uint8_t uavcan_idx;
+    uint8_t read_transfer_id;
     uint8_t retries;
     uint8_t source_node_id;
     int32_t last_erased_page;
@@ -185,6 +186,10 @@ static void file_read_response_handler(size_t msg_size, const void* buf, void* c
         const struct uavcan_deserialized_message_s* msg_wrapper = buf;
         const struct uavcan_protocol_file_Read_res_s *res = (const struct uavcan_protocol_file_Read_res_s*)msg_wrapper->msg;
 
+        if (msg_wrapper->transfer_id != flash_state.read_transfer_id) {
+            return;
+        }
+
         if (res->error.value != 0 || flash_state.ofs + res->data_len > get_app_sec_size()) {
             do_fail_update();
             return;
@@ -218,7 +223,7 @@ static void do_resend_read_request(void) {
     read_req.offset =  flash_state.ofs;
     strncpy((char*)read_req.path.path,flash_state.path,sizeof(read_req.path));
     read_req.path.path_len = strnlen(flash_state.path,sizeof(read_req.path));
-    uavcan_request(flash_state.uavcan_idx, &uavcan_protocol_file_Read_req_descriptor, CANARD_TRANSFER_PRIORITY_HIGH, flash_state.source_node_id, &read_req);
+    flash_state.read_transfer_id = uavcan_request(flash_state.uavcan_idx, &uavcan_protocol_file_Read_req_descriptor, CANARD_TRANSFER_PRIORITY_HIGH, flash_state.source_node_id, &read_req);
     worker_thread_timer_task_reschedule(&WT, &read_timeout_task, LL_MS2ST(500));
     flash_state.retries++;
 }
