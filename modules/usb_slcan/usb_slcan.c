@@ -88,14 +88,17 @@ static void process_slcan_cmd(struct slcan_instance_s* instance, size_t cmd_len)
     switch(instance->cmd_buf[0]) {
         case 'L': { // Open CAN channel in silent mode
             instance->loopback_enable = false;
+            chnWriteTimeout(&SDU1, (uint8_t*)"\r", 1, TIME_IMMEDIATE);
             return;
         }
         case 'O': { // Open CAN channel in normal mode
             instance->loopback_enable = false;
+            chnWriteTimeout(&SDU1, (uint8_t*)"\r", 1, TIME_IMMEDIATE);
             return;
         }
         case 'l': {
             instance->loopback_enable = true;
+            chnWriteTimeout(&SDU1, (uint8_t*)"\r", 1, TIME_IMMEDIATE);
             return;
         }
     }
