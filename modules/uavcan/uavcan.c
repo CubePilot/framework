@@ -458,10 +458,10 @@ bool uavcan_broadcast(uint8_t uavcan_idx, const struct uavcan_message_descriptor
     return uavcan_broadcast_with_callback(uavcan_idx, msg_descriptor, priority, msg_data, LL_S2ST(2), NULL);
 }
 
-bool uavcan_request(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, uint8_t dest_node_id, void* msg_data) {
+uint8_t uavcan_request(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, uint8_t dest_node_id, void* msg_data) {
     struct uavcan_instance_s* instance = uavcan_get_instance(uavcan_idx);
     if (!instance) {
-        return false;
+        return (uint8_t)-1;
     }
 
     uint16_t data_type_id = msg_descriptor->default_data_type_id;
@@ -469,10 +469,11 @@ bool uavcan_request(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s
     uint8_t* transfer_id = uavcan_transfer_id_map_retrieve(&instance->transfer_id_map, false, data_type_id, 0);
     chSysUnlock();
     if(_uavcan_send(instance, msg_descriptor, data_type_id, priority, *transfer_id, dest_node_id, msg_data, LL_S2ST(2), NULL)) {
+        uint8_t ret = (*transfer_id)&0x1f;
         (*transfer_id)++;
-        return true;
+        return ret;
     } else {
-        return false;
+        return (uint8_t)-1;
     }
 }
 
