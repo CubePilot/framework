@@ -75,12 +75,6 @@ static void getdirentryinfo_req_listener_task_func(size_t msg_size, const void* 
     }
 
     f_close(&f);
+
     uavcan_respond(msg_wrapper->uavcan_idx, msg_wrapper, &res);
-
-    static systime_t last_print_t;
-    if (chVTGetSystemTimeX()-last_print_t > LL_MS2ST(2000)) {
-        uavcan_send_debug_msg(UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_DEBUG, "", "write %u misses", getdirentryinfo_req_listener_task.listener.misses);
-        last_print_t = chVTGetSystemTimeX();
-    }
-
 }
