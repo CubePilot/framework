@@ -362,7 +362,7 @@ bool can_driver_stm32_load_tx_I(void* ctx, uint8_t mb_idx, struct can_frame_s* f
     //Set Add Request
     instance->can->TXBAR = (1 << mb_idx);
 
-    return mb_idx;
+    return true;
 }
 
 static bool can_driver_stm32_retreive_rx_frame_I(struct can_driver_stm32_instance_s* instance,
