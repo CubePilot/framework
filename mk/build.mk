@@ -1,6 +1,6 @@
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -Os
+  USE_OPT = -O0
 endif
 
 override USE_OPT += -Wl,--wrap=log10f -Wl,--wrap=_impure_ptr -ggdb -std=gnu99 --specs=nosys.specs --specs=nano.specs -Werror=double-promotion -ffast-math

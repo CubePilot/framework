@@ -13,7 +13,7 @@
 
 #define NUM_TX_MAILBOXES 3
 
-#define FDCAN_FRAME_BUFFER_SIZE 4         // Buffer size for 8 bytes data field
+#define FDCAN_FRAME_BUFFER_SIZE 4         // Buffer size for 8 bytes data field, in 32-bit words
 
 //Message RAM Allocations in Word lengths
 #define MAX_FILTER_LIST_SIZE 80U            //80 element Standard Filter List elements or 40 element Extended Filter List
@@ -36,6 +36,7 @@ static const struct can_driver_iface_s can_driver_stm32_iface = {
 };
 
 struct message_ram_s {
+    // These contain the start addresses of various buffers in CAN SRAM
     uint32_t StandardFilterSA;
     uint32_t ExtendedFilterSA;
     uint32_t RxFIFO0SA;
@@ -54,7 +55,8 @@ struct can_timing_s {
 struct can_driver_stm32_instance_s {
     struct can_instance_s* frontend;
     struct message_ram_s message_ram;
-    uint32_t fdcan_ram_offset;
+    uint32_t fdcan_ram_offset; // Offset of next allocatable block in CAN SRAM, in 32-bit words
+    uint32_t tx_bits_processed;
     FDCAN_GlobalTypeDef* can;
 };
 
@@ -77,18 +79,16 @@ static bool setupMessageRam(struct can_driver_stm32_instance_s* can_instance)
     // Rx FIFO 0 start address and element count
     num_elements = MIN((FDCAN_NUM_RXFIFO0_SIZE/FDCAN_FRAME_BUFFER_SIZE), 64U);
     if (num_elements) {
-        can_instance->can->RXF0C = (num_elements << 16);
+        can_instance->can->RXF0C = (num_elements << 16) | (can_instance->fdcan_ram_offset << 2);
         can_instance->message_ram.RxFIFO0SA = SRAMCAN_BASE;
         can_instance->fdcan_ram_offset += num_elements*FDCAN_FRAME_BUFFER_SIZE;
     }
 
     // Tx FIFO/queue start address and element count
-    num_elements = MIN((FDCAN_TX_FIFO_BUFFER_SIZE/FDCAN_FRAME_BUFFER_SIZE), NUM_TX_MAILBOXES);
-    if (num_elements) {
-        can_instance->can->TXBC = (num_elements << 16) | (can_instance->fdcan_ram_offset << 2);
-        can_instance->message_ram.TxBuffer = SRAMCAN_BASE + (can_instance->fdcan_ram_offset * 4U);
-        can_instance->fdcan_ram_offset += num_elements*FDCAN_FRAME_BUFFER_SIZE;
-    }
+    can_instance->can->TXBC = (NUM_TX_MAILBOXES << 16) | (can_instance->fdcan_ram_offset << 2);
+    can_instance->message_ram.TxBuffer = SRAMCAN_BASE + (can_instance->fdcan_ram_offset * 4U);
+    can_instance->fdcan_ram_offset += NUM_TX_MAILBOXES*FDCAN_FRAME_BUFFER_SIZE;
+
     can_instance->message_ram.EndAddress = SRAMCAN_BASE + (can_instance->fdcan_ram_offset * 4U);
     if (can_instance->message_ram.EndAddress > MESSAGE_RAM_END_ADDR) {
         return false;
@@ -278,13 +278,13 @@ static void can_driver_stm32_start(void* ctx, bool silent, bool auto_retransmit,
                 FDCAN_IE_RF0FE |  // Rx FIFO 1 FIFO Full
                 FDCAN_IE_RF1NE |  // RX FIFO 1 new message
                 FDCAN_IE_RF1FE;   // Rx FIFO 1 FIFO Full
-    if (auto_retransmit) {
-        instance->can->IE |=  FDCAN_IE_TCFE; // Transmit Canceled interrupt enable, it doubles as 
-                                             // transmit failed in Disabled AutoRetransmission mode.
-    }
-    instance->can->ILS = FDCAN_ILS_TCL;  //Set Line 1 for Transmit Complete Event Interrupt
+    instance->can->IE |=  FDCAN_IE_TCFE; // Transmit Canceled interrupt enable, it doubles as
+                                         // transmit failed in Disabled AutoRetransmission mode.
+    instance->can->ILS = FDCAN_ILS_TCL | FDCAN_ILS_TCFL;  //Set Line 1 for Transmit Complete Event Interrupt
     instance->can->TXBTIE = (1 << NUM_TX_MAILBOXES) - 1;
-    instance->can->ILE = 0x3;
+    instance->can->ILE = 0x3; // Enable both interrupt handlers
+
+    instance->tx_bits_processed = 0;
 
     //Leave Init
     instance->can->CCCR &= ~FDCAN_CCCR_INIT; // Leave init mode
@@ -293,8 +293,6 @@ static void can_driver_stm32_start(void* ctx, bool silent, bool auto_retransmit,
 
 static void can_driver_stm32_stop(void* ctx) {
     struct can_driver_stm32_instance_s* instance = ctx;
-
-    instance->can->CCCR &= ~FDCAN_CCCR_INIT;
 
     nvicDisableVector(FDCAN1_IT0_IRQn);
     nvicDisableVector(FDCAN1_IT1_IRQn);
@@ -307,17 +305,9 @@ bool can_driver_stm32_abort_tx_I(void* ctx, uint8_t mb_idx) {
 
     chDbgCheckClassI();
 
-    const uint8_t cel = instance->can->ECR >> 16;
-
-    if (cel != 0) {
-        if (((1 << mb_idx) & instance->can->TXBRP)) {
-            instance->can->TXBCR = 1 << mb_idx;
-            //Wait for Cancelation to finish
-            while (!(instance->can->TXBCF & (1 << mb_idx))) {
-                __asm__("nop");
-            }
-            return true;
-        }
+    if (mb_idx < NUM_TX_MAILBOXES && ((1 << mb_idx) & instance->can->TXBRP)) {
+        instance->can->TXBCR = 1 << mb_idx;
+        return true;
     }
 
     return false;
@@ -361,42 +351,29 @@ bool can_driver_stm32_load_tx_I(void* ctx, uint8_t mb_idx, struct can_frame_s* f
 
     //Set Add Request
     instance->can->TXBAR = (1 << mb_idx);
+    instance->tx_bits_processed &= ~(1UL << mb_idx);
 
     return true;
 }
 
 static bool can_driver_stm32_retreive_rx_frame_I(struct can_driver_stm32_instance_s* instance,
-                                                struct can_frame_s* frame, uint8_t fifo_index) {
+                                                struct can_frame_s* frame) {
     uint32_t *frame_ptr;
     uint32_t index;
 
-    if (fifo_index == 0) {
-        //Check if RAM allocated to RX FIFO
-        if ((instance->can->RXF0C & FDCAN_RXF0C_F0S) == 0) {
-            return false; 
-        }
 
-        if ((instance->can->RXF0S & FDCAN_RXF0S_F0FL) == 0) {
-            return false; //No More messages in FIFO
-        } else {
-            index = ((instance->can->RXF0S & FDCAN_RXF0S_F0GI) >> 8);
-            frame_ptr = (uint32_t *)(instance->message_ram.RxFIFO0SA + (index * FDCAN_FRAME_BUFFER_SIZE * 4));
-        }
-    } else if (fifo_index == 1) {
-        //Check if RAM allocated to RX FIFO
-        if ((instance->can->RXF1C & FDCAN_RXF1C_F1S) == 0) {
-            return false;
-        }
-
-        if ((instance->can->RXF1S & FDCAN_RXF1S_F1FL) == 0) {
-            return false; //No More messages in FIFO
-        } else {
-            index = ((instance->can->RXF1S & FDCAN_RXF1S_F1GI) >> 8);
-            frame_ptr = (uint32_t *)(instance->message_ram.RxFIFO1SA + (index * FDCAN_FRAME_BUFFER_SIZE * 4));
-        }
-    } else {
+    //Check if RAM allocated to RX FIFO
+    if ((instance->can->RXF0C & FDCAN_RXF0C_F0S) == 0) {
         return false;
     }
+
+    if ((instance->can->RXF0S & FDCAN_RXF0S_F0FL) == 0) {
+        return false; //No More messages in FIFO
+    } else {
+        index = ((instance->can->RXF0S & FDCAN_RXF0S_F0GI) >> 8);
+        frame_ptr = (uint32_t *)(instance->message_ram.RxFIFO0SA + (index * FDCAN_FRAME_BUFFER_SIZE * 4));
+    }
+
 
     // Read the frame contents
     uint32_t id = frame_ptr[0];
@@ -423,23 +400,19 @@ static bool can_driver_stm32_retreive_rx_frame_I(struct can_driver_stm32_instanc
     }
 
     //Acknowledge the FIFO entry we just read
-    if (fifo_index == 0) {
-        instance->can->RXF0A = index;
-    } else if (fifo_index == 1) {
-        instance->can->RXF1A = index;
-    }
+    instance->can->RXF0A = index;
     return true;
 }
 
-static void stm32_can_rx_handler(struct can_driver_stm32_instance_s* instance, uint8_t fifo_index) {
+static void stm32_can_rx_handler(struct can_driver_stm32_instance_s* instance) {
     systime_t rx_systime = chVTGetSystemTimeX();
     while (true) {
         chSysLockFromISR();
         struct can_frame_s frame;
-        if (!can_driver_stm32_retreive_rx_frame_I(instance, &frame, fifo_index)) {
+        if (!can_driver_stm32_retreive_rx_frame_I(instance, &frame)) {
             break;
         }
-        can_driver_rx_frame_received_I(instance->frontend, fifo_index, rx_systime, &frame);
+        can_driver_rx_frame_received_I(instance->frontend, 0, rx_systime, &frame);
         chSysUnlockFromISR();
     }
     chSysUnlockFromISR();
@@ -451,20 +424,22 @@ static void stm32_can_tx_handler(struct can_driver_stm32_instance_s* instance) {
     chSysLockFromISR();
 
     for (uint8_t i = 0; i < NUM_TX_MAILBOXES; i++) {
-        if (!can_driver_get_mailbox_transmit_pending(instance->frontend, i)) {
+        if (instance->tx_bits_processed & (1UL << i)) {
             continue;
         }
-        if ((instance->can->TXBTO & (1UL << i))) {
+
+        if (instance->can->TXBTO & (1UL << i)) {
+            // Transmit successful
             can_driver_tx_request_complete_I(instance->frontend, i, true, t_now);
-        } else if ((instance->can->TXBCF & (1UL << i)) && (instance->can->CCCR & FDCAN_CCCR_DAR)) {
-            // Only get here if Auto Retransmission is Disabled
-            if (can_driver_get_mailbox_transmit_pending(instance->frontend, i)) {
-                // we request transmission again
-                instance->can->TXBAR |= (1UL << i);
-            } else {
-                // Just notify that Tx request failed
-                can_driver_tx_request_complete_I(instance->frontend, i, false, t_now);
-            }
+            instance->tx_bits_processed |= (1UL << i);
+        } else if ((instance->can->CCCR & FDCAN_CCCR_DAR) && (instance->can->TXBCF & (1UL << i)) && can_driver_get_mailbox_transmit_pending(instance->frontend, i) && ((instance->can->ECR & 0xff) == 0)) {
+            // Auto-retransmit disabled and transmit cancellation finished and frontend says transmit still desired and no transmit errors
+            // Ideally we would use an error flag pertaining to the current frame, rather than the error counter.
+            instance->can->TXBAR |= (1UL << i);
+            instance->tx_bits_processed &= ~(1UL << i);
+        } else if (instance->can->TXBCF & (1UL << i)) {
+            can_driver_tx_request_complete_I(instance->frontend, i, false, t_now);
+            instance->tx_bits_processed |= (1UL << i);
         }
     }
     chSysUnlockFromISR();
@@ -476,16 +451,16 @@ static void stm32_can_interrupt_handler(struct can_driver_stm32_instance_s *inst
         if ((instance->can->IR & FDCAN_IR_RF0N) ||
            (instance->can->IR & FDCAN_IR_RF0F)) {
             instance->can->IR = FDCAN_IR_RF0N | FDCAN_IR_RF0F;
-            stm32_can_rx_handler(instance, 0);
-        }
-        if ((instance->can->IR & FDCAN_IR_RF1N) ||
-           (instance->can->IR & FDCAN_IR_RF1F)) {
-            instance->can->IR = FDCAN_IR_RF1N | FDCAN_IR_RF1F;
-            stm32_can_rx_handler(instance, 1);
+            stm32_can_rx_handler(instance);
         }
     } else {
         if (instance->can->IR & FDCAN_IR_TC) {
             instance->can->IR = FDCAN_IR_TC;
+            stm32_can_tx_handler(instance);
+        }
+
+        if (instance->can->IR & FDCAN_IR_TCF) {
+            instance->can->IR = FDCAN_IR_TCF;
             stm32_can_tx_handler(instance);
         }
     }

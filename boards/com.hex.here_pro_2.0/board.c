@@ -36,3 +36,26 @@ void boardInit(void) {
     palSetLineMode(BOARD_PAL_LINE_ICM_CS, PAL_MODE_OUTPUT_PUSHPULL | PAL_STM32_OSPEED_HIGHEST);
     palSetLine(BOARD_PAL_LINE_ICM_CS);
 }
+
+
+#if HAL_USE_SDC || defined(__DOXYGEN__)
+/**
+ * @brief   SDC card detection.
+ */
+bool sdc_lld_is_card_inserted(SDCDriver *sdcp) {
+
+  (void)sdcp;
+  /* TODO: Fill the implementation.*/
+  return true;
+}
+
+/**
+ * @brief   SDC card write protection detection.
+ */
+bool sdc_lld_is_write_protected(SDCDriver *sdcp) {
+
+  (void)sdcp;
+  /* TODO: Fill the implementation.*/
+  return false;
+}
+#endif /* HAL_USE_SDC */

@@ -271,6 +271,10 @@ struct can_tx_frame_s* can_allocate_tx_frames(struct can_instance_s* instance, s
 }
 
 void can_enqueue_tx_frames(struct can_instance_s* instance, struct can_tx_frame_s** frame_list, systime_t tx_timeout, struct pubsub_topic_s* completion_topic, enum can_frame_origin_t origin) {
+#ifndef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+    (void)origin;
+#endif
+
     if (!instance) {
         return;
     }
