@@ -22,8 +22,7 @@ uavcan_beginfirmwareupdate_server \
 uavcan_allocatee \
 uavcan_restart \
 freemem_check \
-uavcan_timesync \
-logger
+uavcan_timesync
 
 MESSAGES_ENABLED = \
 uavcan.protocol.debug.LogMessage

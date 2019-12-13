@@ -50,8 +50,8 @@ RUN_AFTER(CAN_INIT) {
     instance.flags_enable = false;
     instance.loopback_enable = false;
 
-    worker_thread_add_timer_task(&WT, &usb_connect_timer_task, usb_connect_timer_task_func, &instance, LL_S2ST(1), false);
-    worker_thread_add_timer_task(&WT, &usb_rx_timer_task, usb_rx_timer_task_func, &instance, LL_MS2ST(1), true);
+    worker_thread_add_timer_task(&WT, &usb_connect_timer_task, usb_connect_timer_task_func, &instance, chTimeS2I(1), false);
+    worker_thread_add_timer_task(&WT, &usb_rx_timer_task, usb_rx_timer_task_func, &instance, chTimeMS2I(1), true);
     worker_thread_add_listener_task(&WT, &can_rx_listener_task, can_get_rx_topic(instance.can_instance), can_rx_listener_task_func, &instance);
 }
 
@@ -297,5 +297,5 @@ static void can_rx_listener_task_func(size_t buf_size, const void* buf, void* ct
 
     slcan_frame[slcan_frame_len++] = '\r';
 
-    chnWriteTimeout(&SDU1, (uint8_t*)slcan_frame, slcan_frame_len, LL_MS2ST(10));
+    chnWriteTimeout(&SDU1, (uint8_t*)slcan_frame, slcan_frame_len, chTimeMS2I(10));
 }
