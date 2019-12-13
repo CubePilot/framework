@@ -14,9 +14,9 @@ void __early_init(void) {
 
 void board_get_unique_id(uint8_t* buf, uint8_t len) {
     uint32_t unique_id_uint32[3];
-    unique_id_uint32[0] = ((uint32_t*)0x1FF0F420)[2];
-    unique_id_uint32[1] = ((uint32_t*)0x1FF0F420)[1];
-    unique_id_uint32[2] = ((uint32_t*)0x1FF0F420)[0];
+    unique_id_uint32[0] = ((uint32_t*)0x1FF1E800)[2];
+    unique_id_uint32[1] = ((uint32_t*)0x1FF1E800)[1];
+    unique_id_uint32[2] = ((uint32_t*)0x1FF1E800)[0];
 
     if (len>12) {
         memset(buf, 0, len);

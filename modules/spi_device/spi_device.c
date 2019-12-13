@@ -124,22 +124,37 @@ void spi_device_exchange(struct spi_device_s* dev, uint32_t n, const void* txbuf
     }
 }
 
+#ifdef STM32H7
+#define STM32_SPIx_CLK(x) ((x == 1) ? STM32_SPI1CLK : (x == 2) ? STM32_SPI2CLK : (x == 3) ? STM32_SPI3CLK : (x == 4) ? STM32_SPI4CLK : (x == 5) ? STM32_SPI5CLK : (x == 6) ? STM32_SPI6CLK : 0)
+#else
 #define STM32_SPIx_CLK(x) ((x == 2 || x == 3) ? (STM32_PCLK1) : (STM32_PCLK2))
-
+#endif
 static SPIConfig spi_make_config(struct spi_device_s* dev) {
     uint8_t br_regval;
     for (br_regval=0; br_regval<7; br_regval++) {
+#ifdef STM32H7
+        if ((uint32_t)STM32_SPIx_CLK(dev->bus_idx)/(2<<(br_regval+1)) < dev->max_speed_hz) {
+            break;
+        }
+#else
         if ((uint32_t)STM32_SPIx_CLK(dev->bus_idx)/(2<<br_regval) < dev->max_speed_hz) {
             break;
         }
+#endif
     }
 
     SPIConfig ret;
+    ret.circular = false;
     ret.end_cb = NULL;
     ret.ssport = 0;
     ret.sspad = 0;
+#ifdef STM32H7
+    ret.cfg1 = ((br_regval&0b111)<<28) | (((dev->data_size-1)&0b1111)<<0);
+    ret.cfg2 = (FLAG_BIT_VAL(dev->flags,SPI_DEVICE_FLAG_CPHA)<<24) | (FLAG_BIT_VAL(dev->flags,SPI_DEVICE_FLAG_CPOL)<<25) | (FLAG_BIT_VAL(dev->flags,SPI_DEVICE_FLAG_LSBFIRST)<<23);
+#else
     ret.cr1 = ((br_regval&0b111)<<3) | (FLAG_BIT_VAL(dev->flags,SPI_DEVICE_FLAG_CPHA)<<0) | (FLAG_BIT_VAL(dev->flags,SPI_DEVICE_FLAG_CPOL)<<1) | (FLAG_BIT_VAL(dev->flags,SPI_DEVICE_FLAG_LSBFIRST)<<7);
     ret.cr2 = (((dev->data_size-1)&0b1111)<<8);
+#endif
     return ret;
 }
 
