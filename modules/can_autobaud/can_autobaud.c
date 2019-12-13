@@ -24,7 +24,7 @@ WORKER_THREAD_DECLARE_EXTERN(WT)
 #define CAN_AUTOBAUD_SWITCH_INTERVAL_US 1000000
 
 #ifdef MODULE_PARAM_ENABLED
-PARAM_DEFINE_UINT32_PARAM_STATIC(can_bitrate_param, "can1.bitrate", 0, 0, 1000000)
+PARAM_DEFINE_UINT32_PARAM_STATIC(can_bitrate_param, "can1.bitrate", 1000000, 0, 1000000)
 #endif
 
 static const uint32_t valid_baudrates[] = {1000000, 500000, 250000, 125000};

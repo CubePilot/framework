@@ -559,7 +559,7 @@
  * @note    The default is @p CH_DBG_TRACE_MASK_DISABLED.
  */
 #if !defined(CH_DBG_TRACE_MASK)
-#define CH_DBG_TRACE_MASK                   CH_DBG_TRACE_MASK_DISABLED
+#define CH_DBG_TRACE_MASK                   CH_DBG_TRACE_MASK_USER
 #endif
 
 /**
@@ -689,9 +689,11 @@
  *          should be invoked from here.
  * @note    This macro can be used to activate a power saving mode.
  */
+#ifndef CH_CFG_IDLE_ENTER_HOOK
 #define CH_CFG_IDLE_ENTER_HOOK() {                                          \
   /* Idle-enter code here.*/                                                \
 }
+#endif //CH_CFG_IDLE_ENTER_HOOK
 
 /**
  * @brief   Idle thread leave hook.
@@ -699,9 +701,11 @@
  *          should be invoked from here.
  * @note    This macro can be used to deactivate a power saving mode.
  */
+#ifndef CH_CFG_IDLE_LEAVE_HOOK
 #define CH_CFG_IDLE_LEAVE_HOOK() {                                          \
   /* Idle-leave code here.*/                                                \
 }
+#endif //CH_CFG_IDLE_LEAVE_HOOK
 
 /**
  * @brief   Idle Loop hook.

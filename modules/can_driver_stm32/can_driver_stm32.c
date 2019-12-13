@@ -22,7 +22,7 @@
 #define RX_FIFO_DEPTH 3
 
 static void can_driver_stm32_start(void* ctx, bool silent, bool auto_retransmit, uint32_t baudrate);
-static void can_driver_stm32_stop(void* ctx);
+static void can_driver_stm32_stop(void* ctx)
 bool can_driver_stm32_abort_tx_mailbox_I(void* ctx, uint8_t mb_idx);
 bool can_driver_stm32_load_tx_mailbox_I(void* ctx, uint8_t mb_idx, struct can_frame_s* frame);
 
@@ -123,6 +123,7 @@ static void can_driver_stm32_start(void* ctx, bool silent, bool auto_retransmit,
     instance->can->IER = CAN_IER_TMEIE | CAN_IER_FMPIE0; // TODO: review reference manual for other interrupt flags needed
 }
 
+
 static void can_driver_stm32_stop(void* ctx) {
     struct can_driver_stm32_instance_s* instance = ctx;
 
@@ -135,6 +136,7 @@ static void can_driver_stm32_stop(void* ctx) {
 
     rccDisableCAN1();
 }
+
 
 bool can_driver_stm32_abort_tx_mailbox_I(void* ctx, uint8_t mb_idx) {
     struct can_driver_stm32_instance_s* instance = ctx;
@@ -159,6 +161,11 @@ bool can_driver_stm32_load_tx_mailbox_I(void* ctx, uint8_t mb_idx, struct can_fr
     struct can_driver_stm32_instance_s* instance = ctx;
 
     chDbgCheckClassI();
+
+    // if silent just return fail
+    if ((instance->can->BTR & CAN_BTR_SILM) != 0) {
+        return false;
+    }
 
     CAN_TxMailBox_TypeDef* mailbox = &instance->can->sTxMailBox[mb_idx];
 

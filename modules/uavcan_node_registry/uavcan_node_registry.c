@@ -58,7 +58,7 @@ RUN_AFTER(UAVCAN_INIT) {
         struct pubsub_topic_s* nodeinfo_res_topic = uavcan_get_message_topic(i, &uavcan_protocol_GetNodeInfo_res_descriptor);
         worker_thread_add_listener_task(&WT, &instance->nodeinfo_res_listener_task, nodeinfo_res_topic, nodeinfo_res_listener_task_func, instance);
 
-        worker_thread_add_timer_task(&WT, &instance->cleanup_task, cleanup_task_func, instance, LL_S2ST(1), true);
+        worker_thread_add_timer_task(&WT, &instance->cleanup_task, cleanup_task_func, instance, chTimeS2I(1), true);
     }
 }
 
