@@ -25,7 +25,7 @@ RUN_AFTER(CH_SYS_INIT) {
         if (res == FR_OK) {
             break;
         }
-        chThdSleep(LL_MS2ST(10));
+        chThdSleep(chTimeMS2I(10));
     }
 
 #ifdef MICROSD_MOUNT_FAIL_REFORMAT
