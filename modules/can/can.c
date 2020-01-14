@@ -460,7 +460,7 @@ static void can_try_enqueue_waiting_frame_I(struct can_instance_s* instance) {
         if (instance->tx_mailbox[i].state == CAN_TX_MAILBOX_EMPTY) {
             have_empty_mailbox = true;
             empty_mailbox_idx = i;
-        } else if (instance->tx_mailbox[i].state == CAN_TX_MAILBOX_PENDING || instance->tx_mailbox[i].state == CAN_TX_MAILBOX_ABORTING) {
+        } else if (instance->tx_mailbox[i].state == CAN_TX_MAILBOX_PENDING) {
             can_frame_priority_t prio = can_get_tx_frame_priority_X(instance->tx_mailbox[i].frame);
             if (!have_pending_mailbox || prio > highest_prio_pending) {
                 highest_prio_pending = prio;
