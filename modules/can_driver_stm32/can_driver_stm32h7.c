@@ -60,6 +60,8 @@ struct can_driver_stm32_instance_s {
     FDCAN_GlobalTypeDef* can;
 };
 
+static void stm32_can_tx_handler_I(struct can_driver_stm32_instance_s* instance);
+
 static struct can_driver_stm32_instance_s can1_instance;
 
 RUN_ON(CAN_INIT) {
@@ -277,10 +279,11 @@ static void can_driver_stm32_start(void* ctx, bool silent, bool auto_retransmit,
                 FDCAN_IE_RF0NE |  // RX FIFO 0 new message
                 FDCAN_IE_RF0FE |  // Rx FIFO 1 FIFO Full
                 FDCAN_IE_RF1NE |  // RX FIFO 1 new message
-                FDCAN_IE_RF1FE;   // Rx FIFO 1 FIFO Full
-    instance->can->IE |=  FDCAN_IE_TCFE | (1UL<<27); // Transmit Canceled interrupt enable, it doubles as
+                FDCAN_IE_RF1FE |  // Rx FIFO 1 FIFO Full
+                FDCAN_IE_BOE;     // bus off
+    instance->can->IE |=  FDCAN_IE_TCFE | FDCAN_IE_PEAE; // Transmit Canceled interrupt enable, it doubles as
                                          // transmit failed in Disabled AutoRetransmission mode.
-    instance->can->ILS = FDCAN_ILS_TCL | FDCAN_ILS_TCFL | (1UL<<27);  //Set Line 1 for Transmit Complete Event Interrupt
+    instance->can->ILS = FDCAN_ILS_TCL | FDCAN_ILS_TCFL | FDCAN_ILS_PEAE | FDCAN_ILS_BOE;  //Set Line 1 for Transmit Complete Event Interrupt
     instance->can->TXBTIE = (1 << NUM_TX_MAILBOXES) - 1;
     instance->can->ILE = 0x3; // Enable both interrupt handlers
 
@@ -418,10 +421,8 @@ static void stm32_can_rx_handler(struct can_driver_stm32_instance_s* instance) {
     chSysUnlockFromISR();
 }
 
-static void stm32_can_tx_handler(struct can_driver_stm32_instance_s* instance) {
+static void stm32_can_tx_handler_I(struct can_driver_stm32_instance_s* instance) {
     systime_t t_now = chVTGetSystemTimeX();
-
-    chSysLockFromISR();
 
     for (uint8_t i = 0; i < NUM_TX_MAILBOXES; i++) {
         if (instance->tx_bits_processed & (1UL << i)) {
@@ -442,7 +443,11 @@ static void stm32_can_tx_handler(struct can_driver_stm32_instance_s* instance) {
             can_driver_tx_request_complete_I(instance->frontend, i, false, t_now);
         }
     }
+}
 
+static void stm32_can_tx_handler(struct can_driver_stm32_instance_s* instance) {
+    chSysLockFromISR();
+    stm32_can_tx_handler_I(instance);
     chSysUnlockFromISR();
 }
 
@@ -458,6 +463,7 @@ static void stm32_can_interrupt_handler(struct can_driver_stm32_instance_s *inst
         if (instance->can->IR & FDCAN_IR_TC) {
             instance->can->IR = FDCAN_IR_TC;
             stm32_can_tx_handler(instance);
+
         }
 
         if (instance->can->IR & FDCAN_IR_TCF) {
@@ -465,8 +471,14 @@ static void stm32_can_interrupt_handler(struct can_driver_stm32_instance_s *inst
             stm32_can_tx_handler(instance);
         }
 
-        if (instance->can->IR & (1UL << 27)) {
-            instance->can->IR = (1UL << 27);
+        if (instance->can->IR & FDCAN_IR_PEA) {
+            instance->can->IR = FDCAN_IR_PEA;
+            stm32_can_tx_handler(instance);
+        }
+
+        if (instance->can->IR & FDCAN_IR_BO) {
+            instance->can->IR = FDCAN_IR_BO;
+            instance->can->CCCR &= ~FDCAN_CCCR_INIT;
             stm32_can_tx_handler(instance);
         }
     }
