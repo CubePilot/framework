@@ -115,7 +115,7 @@ static void process_slcan_cmd(struct slcan_instance_s* instance, size_t cmd_len)
         // check if cmd is long enough to contain DLC
         // note: cmd_len does not include \r
         if (cmd_len < data_begin_idx || (frame.IDE && cmd_len < data_begin_idx)) {
-            chnWriteTimeout(&SDU1, (uint8_t*)"\a", 1, LL_MS2ST(50));
+            chnWriteTimeout(&SDU1, (uint8_t*)"\a", 1, chTimeMS2I(50));
             return;
         }
 
