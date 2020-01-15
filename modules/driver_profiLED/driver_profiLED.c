@@ -2,7 +2,6 @@
 #include <string.h>
 #include "driver_profiLED.h"
 #include <common/helpers.h>
-#include <app_config.h>
 #include <hal.h>
 
 #define PROFILED_SEND_BUF_SIZE 32
