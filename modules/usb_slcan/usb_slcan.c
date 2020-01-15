@@ -115,7 +115,7 @@ static void process_slcan_cmd(struct slcan_instance_s* instance, size_t cmd_len)
         // check if cmd is long enough to contain DLC
         // note: cmd_len does not include \r
         if (cmd_len < data_begin_idx || (frame.IDE && cmd_len < data_begin_idx)) {
-            chnWriteTimeout(&SDU1, (uint8_t*)"\a", 1, TIME_IMMEDIATE);
+            chnWriteTimeout(&SDU1, (uint8_t*)"\a", 1, LL_MS2ST(50));
             return;
         }
 
@@ -221,10 +221,11 @@ static void usb_rx_timer_task_func(struct worker_thread_timer_task_s* task) {
             process_slcan_cmd(instance, cmd_len-1);
             instance->cmd_buf_len -= cmd_len;
             memmove(instance->cmd_buf, instance->cmd_buf+cmd_len, instance->cmd_buf_len);
-        } else if (instance->cmd_buf_len == sizeof(instance->cmd_buf)) {
-            // buffer is full, just discard it
-            instance->cmd_buf_len = 0;
         } else {
+            if (instance->cmd_buf_len == sizeof(instance->cmd_buf) || USBD1.state != USB_ACTIVE) {
+                // buffer is full, just discard it
+                instance->cmd_buf_len = 0;
+            }
             break;
         }
     }
@@ -232,6 +233,10 @@ static void usb_rx_timer_task_func(struct worker_thread_timer_task_s* task) {
 
 static void can_rx_listener_task_func(size_t buf_size, const void* buf, void* ctx) {
     (void)buf_size;
+
+    if (USBD1.state != USB_ACTIVE) {
+        return;
+    }
 
     struct slcan_instance_s* instance = ctx;
 
