@@ -567,9 +567,9 @@ static void can_expire_handler(struct worker_thread_timer_task_s* task) {
     for (uint8_t i=0; i < instance->num_tx_mailboxes; i++) {
         chSysLock();
         if (instance->tx_mailbox[i].state == CAN_TX_MAILBOX_PENDING && can_tx_frame_expired_X(instance->tx_mailbox[i].frame)) {
-            if (instance->driver_iface->abort_tx_mailbox_I(instance->driver_ctx, i)) {
-                instance->tx_mailbox[i].state = CAN_TX_MAILBOX_ABORTING;
-            }
+            // NOTE: order matters below - abort_tx_mailbox_I may call functions that read the mailbox state
+            instance->tx_mailbox[i].state = CAN_TX_MAILBOX_ABORTING;
+            instance->driver_iface->abort_tx_mailbox_I(instance->driver_ctx, i);
         }
         chSysUnlock();
     }

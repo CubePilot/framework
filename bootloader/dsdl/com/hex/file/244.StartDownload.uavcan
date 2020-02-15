@@ -1,0 +1,6 @@
+uint8 source_node_id
+uavcan.protocol.file.Path source_path
+uavcan.protocol.file.Path dest_path
+---
+void7
+bool ack

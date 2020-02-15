@@ -24,14 +24,19 @@ uavcan_nodestatus_publisher \
 uavcan_allocatee \
 spi_device \
 driver_profiLED \
-uavcan_timesync
+uavcan_timesync \
+uavcan_debug
 
 MESSAGES_ENABLED = \
 uavcan.protocol.GetNodeInfo \
 uavcan.protocol.file.BeginFirmwareUpdate \
 uavcan.protocol.file.Read \
 uavcan.protocol.RestartNode \
-uavcan.equipment.indication.LightsCommand
+uavcan.equipment.indication.LightsCommand \
+com.hex.file.FileStreamStart \
+com.hex.file.FileStreamChunk
+
+DSDL_NAMESPACE_DIRS += dsdl/com
 
 LOAD_REGION = bl
 
