@@ -79,7 +79,7 @@ static void allocation_timer_expired(struct worker_thread_timer_task_s* task) {
     msg.first_part_of_unique_id = (instance->unique_id_offset == 0);
     msg.unique_id_len = MIN(16-instance->unique_id_offset, UAVCAN_PROTOCOL_DYNAMIC_NODE_ID_ALLOCATION_MAX_LENGTH_OF_UNIQUE_ID_IN_REQUEST);
     memcpy(&msg.unique_id, &my_unique_id[instance->unique_id_offset], msg.unique_id_len);
-    uavcan_broadcast(instance->uavcan_idx, &uavcan_protocol_dynamic_node_id_Allocation_descriptor, CANARD_TRANSFER_PRIORITY_LOW, &msg);
+    uavcan_broadcast(instance->uavcan_idx, &uavcan_protocol_dynamic_node_id_Allocation_descriptor, CANARD_TRANSFER_PRIORITY_HIGHEST, &msg);
     instance->unique_id_offset = 0;
 }
 

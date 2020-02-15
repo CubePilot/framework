@@ -4,7 +4,7 @@
 typedef void (*driver_start_t)(void* ctx, bool silent, bool auto_retransmit, uint32_t baudrate);
 typedef void (*driver_stop_t)(void* ctx);
 
-typedef bool (*driver_mailbox_abort_t)(void* ctx, uint8_t mb_idx);
+typedef void (*driver_mailbox_abort_t)(void* ctx, uint8_t mb_idx);
 typedef bool (*driver_load_tx_mailbox_t)(void* ctx, uint8_t mb_idx, struct can_frame_s* frame);
 typedef bool (*driver_pop_rx_frame_t)(void* ctx, uint8_t mb_idx, struct can_frame_s* frame);
 typedef bool (*driver_rx_frame_available_t)(void* ctx, uint8_t mb_idx);

@@ -1,0 +1,3 @@
+uavcan.protocol.file.Path path
+uint40 offset
+uint8[<=256] data
