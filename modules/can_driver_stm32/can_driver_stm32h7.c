@@ -25,7 +25,7 @@
 
 static void can_driver_stm32_start(void* ctx, bool silent, bool auto_retransmit, uint32_t baudrate);
 static void can_driver_stm32_stop(void* ctx);
-bool can_driver_stm32_abort_tx_I(void* ctx, uint8_t mb_idx);
+void can_driver_stm32_abort_tx_I(void* ctx, uint8_t mb_idx);
 bool can_driver_stm32_load_tx_I(void* ctx, uint8_t mb_idx, struct can_frame_s* frame);
 
 static const struct can_driver_iface_s can_driver_stm32_iface = {
@@ -56,7 +56,7 @@ struct can_driver_stm32_instance_s {
     struct can_instance_s* frontend;
     struct message_ram_s message_ram;
     uint32_t fdcan_ram_offset; // Offset of next allocatable block in CAN SRAM, in 32-bit words
-    uint32_t tx_bits_processed;
+    uint32_t tx_cb_called_mask;
     FDCAN_GlobalTypeDef* can;
 };
 
@@ -287,7 +287,7 @@ static void can_driver_stm32_start(void* ctx, bool silent, bool auto_retransmit,
     instance->can->TXBTIE = (1 << NUM_TX_MAILBOXES) - 1;
     instance->can->ILE = 0x3; // Enable both interrupt handlers
 
-    instance->tx_bits_processed = 0;
+    instance->tx_cb_called_mask = 0;
 
     //Leave Init
     instance->can->CCCR &= ~FDCAN_CCCR_INIT; // Leave init mode
@@ -303,17 +303,23 @@ static void can_driver_stm32_stop(void* ctx) {
     RCC->APB1HENR  &= ~RCC_APB1HENR_FDCANEN;
 }
 
-bool can_driver_stm32_abort_tx_I(void* ctx, uint8_t mb_idx) {
+void can_driver_stm32_abort_tx_I(void* ctx, uint8_t mb_idx) {
     struct can_driver_stm32_instance_s* instance = ctx;
 
     chDbgCheckClassI();
+    chDbgCheck(mb_idx < NUM_TX_MAILBOXES);
 
-    if (mb_idx < NUM_TX_MAILBOXES && ((1 << mb_idx) & instance->can->TXBRP)) {
-        instance->can->TXBCR = 1 << mb_idx;
-        return true;
+    stm32_can_tx_handler_I(instance);
+
+    if (((1 << mb_idx) & instance->tx_cb_called_mask)) {
+        // We've already called the completion callback, therefore we fail to abort this mailbox
+        return;
     }
 
-    return false;
+    if ((1 << mb_idx) & instance->can->TXBRP) {
+        // Transmission is pending or in progress, attempt abort
+        instance->can->TXBCR = 1 << mb_idx;
+    }
 }
 
 #define FDCAN_IDE        (0x40000000U) // Identifier Extension
@@ -354,7 +360,7 @@ bool can_driver_stm32_load_tx_I(void* ctx, uint8_t mb_idx, struct can_frame_s* f
 
     //Set Add Request
     instance->can->TXBAR = (1 << mb_idx);
-    instance->tx_bits_processed &= ~(1UL << mb_idx);
+    instance->tx_cb_called_mask &= ~(1UL << mb_idx);
 
     return true;
 }
@@ -425,21 +431,27 @@ static void stm32_can_tx_handler_I(struct can_driver_stm32_instance_s* instance)
     systime_t t_now = chVTGetSystemTimeX();
 
     for (uint8_t i = 0; i < NUM_TX_MAILBOXES; i++) {
-        if (instance->tx_bits_processed & (1UL << i)) {
+        if (instance->tx_cb_called_mask & (1UL << i)) {
+            // Already called callback for this mailbox
+            continue;
+        }
+
+        if (instance->can->TXBRP & (1UL << i)) {
+            // Transmission is still in progress
             continue;
         }
 
         if (instance->can->TXBTO & (1UL << i)) {
             // Transmit successful
-            instance->tx_bits_processed |= (1UL << i);
+            instance->tx_cb_called_mask |= (1UL << i);
             can_driver_tx_request_complete_I(instance->frontend, i, true, t_now);
         } else if ((instance->can->CCCR & FDCAN_CCCR_DAR) && (instance->can->TXBCF & (1UL << i)) && can_driver_get_mailbox_transmit_pending(instance->frontend, i) && ((instance->can->ECR & 0xff) == 0)) {
             // Auto-retransmit disabled and transmit cancellation finished and frontend says transmit still desired and no transmit errors
             // Ideally we would use an error flag pertaining to the current frame, rather than the error counter.
             instance->can->TXBAR |= (1UL << i);
-            instance->tx_bits_processed &= ~(1UL << i);
+            instance->tx_cb_called_mask &= ~(1UL << i);
         } else if (instance->can->TXBCF & (1UL << i)) {
-            instance->tx_bits_processed |= (1UL << i);
+            instance->tx_cb_called_mask |= (1UL << i);
             can_driver_tx_request_complete_I(instance->frontend, i, false, t_now);
         }
     }

@@ -1,0 +1,10 @@
+bool preserve_source
+bool overwrite_destination
+void6
+
+uavcan.protocol.file.Path source
+uavcan.protocol.file.Path destination
+
+---
+
+uavcan.protocol.file.Error error

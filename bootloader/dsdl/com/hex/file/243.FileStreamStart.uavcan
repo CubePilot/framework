@@ -1,0 +1,4 @@
+uavcan.protocol.file.Path path
+uint40 offset
+---
+uavcan.protocol.file.Error error

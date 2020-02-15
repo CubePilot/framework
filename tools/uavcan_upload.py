@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('node_name', nargs=1)
 parser.add_argument('firmware_name', nargs=1)
 parser.add_argument('bus', nargs=1)
-parser.add_argument('--discovery_time', nargs=1, default=5)
+parser.add_argument('--discovery_time', nargs=1, default=[5])
 args = parser.parse_args()
 
 with open(args.firmware_name[0], 'rb') as f:
@@ -43,7 +43,7 @@ def monitor_update_handler(e):
         print(e.entry)
         if e.entry.info.name == args.node_name[0]:
             if e.entry.info.software_version.image_crc != firmware_crc:
-                if e.entry.status.mode != e.entry.status.MODE_SOFTWARE_UPDATE:
+                if e.entry.status.mode != e.entry.status.MODE_SOFTWARE_UPDATE or e.entry.status.health == e.entry.status.HEALTH_CRITICAL:
                     print('updating %u' % (e.entry.node_id,))
                     req_msg = uavcan.protocol.file.BeginFirmwareUpdate.Request(source_node_id=node.node_id, image_file_remote_path=uavcan.protocol.file.Path(path=args.firmware_name[0]))
                     node.request(req_msg, e.entry.node_id, update_response_handler)

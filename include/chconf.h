@@ -672,16 +672,20 @@
 /**
  * @brief   ISR enter hook.
  */
+#ifndef CH_CFG_IRQ_PROLOGUE_HOOK
 #define CH_CFG_IRQ_PROLOGUE_HOOK() {                                        \
   /* IRQ prologue code here.*/                                              \
 }
+#endif
 
 /**
  * @brief   ISR exit hook.
  */
+#ifndef CH_CFG_IRQ_EPILOGUE_HOOK
 #define CH_CFG_IRQ_EPILOGUE_HOOK() {                                        \
   /* IRQ epilogue code here.*/                                              \
 }
+#endif
 
 /**
  * @brief   Idle thread enter hook.
