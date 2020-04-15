@@ -73,3 +73,5 @@ void transform_alpha_beta_to_d_q(float theta, float alpha, float beta, float* d,
 void hash_fnv_1a(uint32_t len, const uint8_t* buf, uint64_t* hash);
 uint16_t crc16_ccitt(const void *buf, size_t len, uint16_t crc);
 uint32_t crc32(const uint8_t *buf, uint32_t len, uint32_t crc);
+
+uint32_t date_to_utc_stamp(uint16_t year, uint8_t mon, uint8_t day, uint8_t hour, uint8_t min, uint8_t sec);
