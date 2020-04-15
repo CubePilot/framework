@@ -23,3 +23,6 @@ POST_MAKE_ALL_RULE_HOOK: $(BUILDDIR)/$(PROJECT)-bootloader.elf
 $(BUILDDIR)/$(PROJECT)-bootloader.elf:
 	cp $(BOARD_DIR)/bootloader.elf $@
 endif
+
+upload-combined: build/$(BOARD)/$(PROJECT)-combined.bin
+	openocd -f openocd.cfg -c "program $< 0x08000000 verify reset exit"
