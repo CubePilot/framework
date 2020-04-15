@@ -200,20 +200,26 @@ bool ak09916_update(struct ak09916_instance_s *instance)
 
     uint8_t st2 = icm20x48_read_reg(instance->icm_dev, ICM20948_REG_EXT_SLV_SENS_DATA_08);
 
+#ifdef DISABLE_AK09916_SCALING_FIX
+    float fsr = 42120.0f;
+#else
+    float fsr = 49120.0f;
+#endif
+
     int16_t temp = 0;
     temp |= (uint16_t)meas_bytes[0];
     temp |= (uint16_t)meas_bytes[1]<<8;
-    instance->meas.x = temp*42120.0f/32752.0f;
+    instance->meas.x = temp*fsr/32752.0f;
 
     temp = 0;
     temp |= (uint16_t)meas_bytes[2];
     temp |= (uint16_t)meas_bytes[3]<<8;
-    instance->meas.y = temp*42120.0f/32752.0f;
+    instance->meas.y = temp*fsr/32752.0f;
 
     temp = 0;
     temp |= (uint16_t)meas_bytes[4];
     temp |= (uint16_t)meas_bytes[5]<<8;
-    instance->meas.z = temp*42120.0f/32752.0f;
+    instance->meas.z = temp*fsr/32752.0f;
 
     instance->meas.hofl = (st2 & (1<<3)) != 0;
     i2c_slave_new_compass_data(instance);
