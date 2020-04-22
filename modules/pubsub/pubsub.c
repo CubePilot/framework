@@ -9,6 +9,12 @@
 
 PUBSUB_TOPIC_GROUP_DECLARE_EXTERN(PUBSUB_DEFAULT_TOPIC_GROUP);
 
+static uint32_t pubsub_cumulative_misses;
+
+uint32_t pubsub_get_cumulative_misses(void) {
+    return pubsub_cumulative_misses;
+}
+
 void pubsub_create_topic_group(struct pubsub_topic_group_s* topic_group, size_t memory_pool_size, void* memory_pool) {
     if (!topic_group || !memory_pool) {
         return;
@@ -94,6 +100,7 @@ static void pubsub_delete_message_S(struct pubsub_message_s* message_to_delete) 
             if (listener->next_message == message_to_delete) {
                 listener->next_message = message_to_delete->next_in_topic;
                 listener->misses++;
+                pubsub_cumulative_misses++;
             }
             chMtxUnlockS(&listener->mtx);
         }

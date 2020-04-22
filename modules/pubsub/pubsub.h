@@ -116,3 +116,5 @@ void pubsub_multiple_listener_handle_until_timeout(size_t num_listeners, struct 
 void pubsub_listener_set_waiting_thread_reference(struct pubsub_listener_s* listener, thread_reference_t* trpp);
 
 bool pubsub_listener_has_message(struct pubsub_listener_s* listener);
+
+uint32_t pubsub_get_cumulative_misses(void);
