@@ -30,8 +30,10 @@ enum can_frame_origin_t {
 struct can_rx_frame_s {
     struct can_frame_s content;
     systime_t rx_systime;
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
     bool on_physical_bus : 1;
     enum can_frame_origin_t origin : 2;
+#endif
 };
 
 struct can_tx_frame_s {
