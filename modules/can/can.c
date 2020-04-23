@@ -41,6 +41,12 @@ struct can_tx_mailbox_s {
     enum can_tx_mailbox_state_t state;
 };
 
+struct filter_list_element_s {
+    uint32_t mask;
+    uint32_t match;
+    struct filter_list_element_s* next;
+};
+
 struct can_instance_s {
     uint8_t idx;
 
@@ -59,6 +65,10 @@ struct can_instance_s {
     memory_pool_t frame_pool;
     struct can_tx_queue_s tx_queue;
     struct pubsub_topic_s rx_topic;
+
+    memory_pool_t filter_list_pool;
+    struct filter_list_element_s* filter_list_head;
+    bool filtering_enabled;
 
     struct worker_thread_publisher_task_s rx_publisher_task;
 
@@ -85,6 +95,57 @@ static void can_reschedule_expire_timer(struct can_instance_s* instance);
 static void can_try_enqueue_waiting_frame_I(struct can_instance_s* instance);
 static void can_try_enqueue_waiting_frame(struct can_instance_s* instance);
 static void can_tx_frame_completed_I(struct can_instance_s* instance, struct can_tx_frame_s* frame, bool success, systime_t completion_systime);
+
+static struct filter_list_element_s* find_filter_element(struct can_instance_s* instance, uint32_t mask, uint32_t match) {
+    struct filter_list_element_s* element = instance->filter_list_head;
+    while (element) {
+        if (element->mask == mask && element->match == match) {
+            return element;
+        }
+        element = element->next;
+    }
+    return NULL;
+}
+
+void can_add_filter(struct can_instance_s* instance, uint32_t mask, uint32_t match) {
+    if (find_filter_element(instance, mask, match) != NULL) {
+        return;
+    }
+    struct filter_list_element_s* new_element = chPoolAlloc(&instance->filter_list_pool);
+    if (new_element == NULL) {
+        return;
+    }
+    new_element->mask = mask;
+    new_element->match = match;
+    chSysLock();
+    LINKED_LIST_APPEND(struct filter_list_element_s, instance->filter_list_head, new_element);
+    chSysUnlock();
+}
+
+void can_set_filtering_enabled(struct can_instance_s* instance, bool filtering_enabled) {
+    instance->filtering_enabled = filtering_enabled;
+}
+
+static bool can_frame_matches_filter(struct can_instance_s* instance, struct can_frame_s* frame) {
+    uint32_t unmasked_id = 0;
+    if (frame->IDE) {
+        unmasked_id |= frame->EID | (1<<29);
+    } else {
+        unmasked_id |= frame->SID << 18;
+    }
+    if (frame->RTR) {
+        unmasked_id |= 1<<30;
+    }
+
+    struct filter_list_element_s* element = instance->filter_list_head;
+    while (element) {
+        if (element->match == (unmasked_id & element->mask)) {
+            return true;
+        }
+        element = element->next;
+    }
+    return false;
+}
 
 bool can_iterate_instances(struct can_instance_s** instance_ptr) {
     if (!instance_ptr) {
@@ -419,8 +480,13 @@ struct can_instance_s* can_driver_register(uint8_t can_idx, void* driver_ctx, co
         instance->tx_mailbox[i].state = CAN_TX_MAILBOX_EMPTY;
     }
     instance->num_tx_mailboxes = num_tx_mailboxes;
+
+    chPoolObjectInit(&instance->filter_list_pool, sizeof(struct filter_list_element_s), NULL);
+    instance->filter_list_head = NULL;
+    instance->filtering_enabled = true;
     
     chPoolObjectInit(&instance->frame_pool, sizeof(struct can_tx_frame_s), NULL);
+
     chPoolLoadArray(&instance->frame_pool, tx_queue_mem, CAN_TX_QUEUE_LEN);
 
     can_tx_queue_init(&instance->tx_queue);
@@ -600,14 +666,21 @@ void can_driver_rx_frame_received_I(struct can_instance_s* instance, uint8_t mb_
 
     chDbgCheckClassI();
 
+    instance->baudrate_confirmed = true;
+
+    if (instance->filtering_enabled && !can_frame_matches_filter(instance, frame)) {
+        return;
+    }
+
     struct can_rx_frame_s rx_frame;
     rx_frame.content = *frame;
     rx_frame.rx_systime = rx_systime;
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
     rx_frame.origin = CAN_FRAME_ORIGIN_CAN_BUS;
     rx_frame.on_physical_bus = true;
+#endif
 
     worker_thread_publisher_task_publish_I(&instance->rx_publisher_task, &instance->rx_topic, sizeof(struct can_rx_frame_s), pubsub_copy_writer_func, &rx_frame);
-    instance->baudrate_confirmed = true;
 }
 
 bool can_driver_get_mailbox_transmit_pending(struct can_instance_s* instance, uint8_t mb_idx) {

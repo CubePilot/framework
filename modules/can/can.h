@@ -17,6 +17,9 @@ struct can_instance_s* can_get_instance(uint8_t can_idx);
 
 bool can_iterate_instances(struct can_instance_s** instance_ptr);
 
+void can_add_filter(struct can_instance_s* instance, uint32_t mask, uint32_t match);
+void can_set_filtering_enabled(struct can_instance_s* instance, bool filtering_enabled);
+
 void can_start_I(struct can_instance_s* instance, bool silent, bool auto_retransmit, uint32_t baudrate);
 void can_start(struct can_instance_s* instance, bool silent, bool auto_retransmit, uint32_t baudrate);
 
@@ -42,4 +45,10 @@ bool can_send(struct can_instance_s* instance, struct can_frame_s* frame, systim
 
 #ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
 void can_bridge_transmit(struct can_instance_s* instance, const struct can_frame_s* frame);
+#endif
+
+#ifdef CAN_MODULE_ENABLE_BRIDGE_INTERFACE
+#define CAN_RX_FRAME_ORIGIN(frame) ((frame).origin)
+#else
+#define CAN_RX_FRAME_ORIGIN(frame) CAN_FRAME_ORIGIN_CAN_BUS
 #endif
