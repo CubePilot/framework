@@ -213,6 +213,18 @@ static struct pubsub_topic_s* _uavcan_get_message_topic(struct uavcan_instance_s
     // append it
     LINKED_LIST_APPEND(struct uavcan_rx_list_item_s, instance->rx_list_head, rx_list_item);
 
+    // Set up CAN filters
+    if (msg_descriptor->transfer_type == CanardTransferTypeBroadcast) {
+        can_add_filter(instance->can_instance, 0x60FFFF80, 0x20000000 | ((uint32_t)msg_descriptor->default_data_type_id<<8));
+        if (msg_descriptor->default_data_type_id <= 3) { // Message may be anonymous
+            can_add_filter(instance->can_instance, 0x600003FF, 0x20000000 | ((uint32_t)msg_descriptor->default_data_type_id<<8));
+        }
+    } else if (msg_descriptor->transfer_type == CanardTransferTypeRequest) {
+        can_add_filter(instance->can_instance, 0x20FF8080, 0x20008080 | ((uint32_t)msg_descriptor->default_data_type_id<<16));
+    } else if (msg_descriptor->transfer_type == CanardTransferTypeResponse) {
+        can_add_filter(instance->can_instance, 0x20FF8080, 0x20000080 | ((uint32_t)msg_descriptor->default_data_type_id<<16));
+    }
+
     chSysUnlock();
 
     return &rx_list_item->topic;
@@ -497,7 +509,7 @@ static void uavcan_can_rx_handler(size_t msg_size, const void* msg, void* ctx) {
 
     const struct can_rx_frame_s* frame = msg;
 
-    if (frame->origin == CAN_FRAME_ORIGIN_LOCAL) {
+    if (CAN_RX_FRAME_ORIGIN(*frame) == CAN_FRAME_ORIGIN_LOCAL) {
         return;
     }
 
