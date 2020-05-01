@@ -96,7 +96,7 @@ static void can_try_enqueue_waiting_frame_I(struct can_instance_s* instance);
 static void can_try_enqueue_waiting_frame(struct can_instance_s* instance);
 static void can_tx_frame_completed_I(struct can_instance_s* instance, struct can_tx_frame_s* frame, bool success, systime_t completion_systime);
 
-static struct filter_list_element_s* find_filter_element(struct can_instance_s* instance, uint32_t mask, uint32_t match) {
+static struct filter_list_element_s* find_filter_element_I(struct can_instance_s* instance, uint32_t mask, uint32_t match) {
     struct filter_list_element_s* element = instance->filter_list_head;
     while (element) {
         if (element->mask == mask && element->match == match) {
@@ -108,16 +108,18 @@ static struct filter_list_element_s* find_filter_element(struct can_instance_s* 
 }
 
 void can_add_filter(struct can_instance_s* instance, uint32_t mask, uint32_t match) {
-    if (find_filter_element(instance, mask, match) != NULL) {
+    chSysLock();
+    if (find_filter_element_I(instance, mask, match) != NULL) {
+        chSysUnlock();
         return;
     }
-    struct filter_list_element_s* new_element = chPoolAlloc(&instance->filter_list_pool);
+    struct filter_list_element_s* new_element = chPoolAllocI(&instance->filter_list_pool);
     if (new_element == NULL) {
+        chSysUnlock();
         return;
     }
     new_element->mask = mask;
     new_element->match = match;
-    chSysLock();
     LINKED_LIST_APPEND(struct filter_list_element_s, instance->filter_list_head, new_element);
     chSysUnlock();
 }
@@ -477,7 +479,7 @@ struct can_instance_s* can_driver_register(uint8_t can_idx, void* driver_ctx, co
     }
     instance->num_tx_mailboxes = num_tx_mailboxes;
 
-    chPoolObjectInit(&instance->filter_list_pool, sizeof(struct filter_list_element_s), NULL);
+    chPoolObjectInit(&instance->filter_list_pool, sizeof(struct filter_list_element_s), chCoreAllocI);
     instance->filter_list_head = NULL;
     instance->filtering_enabled = true;
     
