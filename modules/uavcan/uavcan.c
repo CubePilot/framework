@@ -213,6 +213,8 @@ static struct pubsub_topic_s* _uavcan_get_message_topic(struct uavcan_instance_s
     // append it
     LINKED_LIST_APPEND(struct uavcan_rx_list_item_s, instance->rx_list_head, rx_list_item);
 
+    chSysUnlock();
+
     // Set up CAN filters
     if (msg_descriptor->transfer_type == CanardTransferTypeBroadcast) {
         can_add_filter(instance->can_instance, 0x60FFFF80, 0x20000000 | ((uint32_t)msg_descriptor->default_data_type_id<<8));
@@ -224,8 +226,6 @@ static struct pubsub_topic_s* _uavcan_get_message_topic(struct uavcan_instance_s
     } else if (msg_descriptor->transfer_type == CanardTransferTypeResponse) {
         can_add_filter(instance->can_instance, 0x20FF8080, 0x20000080 | ((uint32_t)msg_descriptor->default_data_type_id<<16));
     }
-
-    chSysUnlock();
 
     return &rx_list_item->topic;
 }
