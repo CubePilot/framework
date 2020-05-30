@@ -30,6 +30,7 @@ RUN_AFTER(UAVCAN_INIT) {
 static void delayed_restart_func(struct worker_thread_timer_task_s* task) {
     (void)task;
 
+    chSysLock();
 #ifdef MODULE_BOOT_MSG_ENABLED
     union shared_msg_payload_u msg;
     boot_msg_fill_shared_canbus_info(&msg.canbus_info);
@@ -38,6 +39,7 @@ static void delayed_restart_func(struct worker_thread_timer_task_s* task) {
 #endif
 
     NVIC_SystemReset();
+    chSysUnlock();
 }
 
 static void restart_req_handler(size_t msg_size, const void* buf, void* ctx) {

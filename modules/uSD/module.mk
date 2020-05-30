@@ -1,5 +1,5 @@
 LOGGER_MODULE_DIR := $(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))
-UDEFS += -DHAL_USE_SDC
+UDEFS += -DHAL_USE_SDC -DCH_CFG_USE_SEMAPHORES=TRUE
 CSRC += $(CHIBIOS)/os/various/fatfs_bindings/fatfs_diskio.c \
         $(CHIBIOS)/os/various/fatfs_bindings/fatfs_syscall.c \
         $(LOGGER_MODULE_DIR)/fatfs/ff.c \

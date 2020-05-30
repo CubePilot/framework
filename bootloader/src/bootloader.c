@@ -388,8 +388,7 @@ static void corrupt_app(void) {
     update_app_info();
 }
 
-static void boot_app_if_commanded(void)
-{
+static void boot_app_if_commanded(void) {
     if (!get_boot_msg_valid() || boot_msg_id != SHARED_MSG_BOOT) {
         return;
     }

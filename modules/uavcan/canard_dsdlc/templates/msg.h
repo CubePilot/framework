@@ -26,6 +26,7 @@ for field in msg_fields:
 #define @(msg_underscored_name.upper())_@(constant.name.upper()) @(constant.value)
 @[    end for]@
 @[  end if]@
+
 @[  if msg_union]
 enum @(msg_underscored_name)_type_t {
 @[    for field in msg_fields]@
@@ -33,6 +34,7 @@ enum @(msg_underscored_name)_type_t {
 @[    end for]@
 };
 @[  end if]@
+
 
 @(msg_c_type) {
 @[  if msg_union]@
@@ -57,7 +59,7 @@ enum @(msg_underscored_name)_type_t {
 extern const struct uavcan_message_descriptor_s @(msg_underscored_name)_descriptor;
 @[  end if]@
 
-void encode_@(msg_underscored_name)(@(msg_c_type)* msg, uavcan_serializer_chunk_cb_ptr_t chunk_cb, void* ctx);
+void encode_@(msg_underscored_name)(const @(msg_c_type)* msg, uavcan_serializer_chunk_cb_ptr_t chunk_cb, void* ctx);
 uint32_t decode_@(msg_underscored_name)(const CanardRxTransfer* transfer, @(msg_c_type)* msg);
-void _encode_@(msg_underscored_name)(uint8_t* buffer, @(msg_c_type)* msg, uavcan_serializer_chunk_cb_ptr_t chunk_cb, void* ctx, bool tao);
+void _encode_@(msg_underscored_name)(uint8_t* buffer, const @(msg_c_type)* msg, uavcan_serializer_chunk_cb_ptr_t chunk_cb, void* ctx, bool tao);
 void _decode_@(msg_underscored_name)(const CanardRxTransfer* transfer, uint32_t* bit_ofs, @(msg_c_type)* msg, bool tao);

@@ -209,7 +209,7 @@ uint64_t uavcan_timesync_get_bus_time_now(void) {
 }
 
 bool uavcan_timesync_get_systime_at_bus_time(uint64_t bustime, systime_t* systime_ret) {
-    if (!have_valid_systime_offset) {
+    if (!have_valid_systime_offset || bustime == 0) {
         return false;
     }
 

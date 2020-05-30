@@ -296,6 +296,7 @@ static void can_driver_stm32_start(void* ctx, bool silent, bool auto_retransmit,
 
 static void can_driver_stm32_stop(void* ctx) {
     struct can_driver_stm32_instance_s* instance = ctx;
+    (void)instance;
 
     nvicDisableVector(FDCAN1_IT0_IRQn);
     nvicDisableVector(FDCAN1_IT1_IRQn);

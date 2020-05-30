@@ -100,6 +100,7 @@ endif
 -include $(foreach module_dir,$(MODULE_DIRS),$(module_dir)/module.mk)
 
 MODULES_CSRC := $(foreach search_dir,$(MODULE_SEARCH_DIRS),$(foreach module,$(MODULES_ENABLED),$(patsubst $(search_dir)/%,$(MODULES_ENABLED_DIR)/%,$(wildcard $(search_dir)/$(module)/*.c))))
+MODULES_CPPSRC := $(foreach search_dir,$(MODULE_SEARCH_DIRS),$(foreach module,$(MODULES_ENABLED),$(patsubst $(search_dir)/%,$(MODULES_ENABLED_DIR)/%,$(wildcard $(search_dir)/$(module)/*.cpp))))
 
 $(foreach search_dir,$(MODULE_SEARCH_DIRS),$(foreach module,$(MODULES_ENABLED),$(foreach module_dir,$(wildcard $(search_dir)/$(module)),$(eval $(MODULES_ENABLED_DIR)/$(module): $(shell find $(module_dir))))))
 
@@ -155,7 +156,7 @@ CSRC += $(ALLCSRC) \
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
-CPPSRC +=
+CPPSRC += $(MODULES_CPPSRC)
 
 # C sources to be compiled in ARM mode regardless of the global setting.
 # NOTE: Mixing ARM and THUMB mode enables the -mthumb-interwork compiler
@@ -236,4 +237,5 @@ $(MODULE_COPY_DIRS):
 	cp -R -p $(wildcard $(addsuffix /$(patsubst $(MODULES_ENABLED_DIR)/%,%,$@),$(MODULE_SEARCH_DIRS))) $@
 
 $(CSRC): $(MODULE_COPY_DIRS)
+$(CPPSRC): $(MODULE_COPY_DIRS)
 $(ASMXSRC): $(MODULE_COPY_DIRS)
