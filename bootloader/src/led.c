@@ -1,3 +1,4 @@
+#if 0
 #include <modules/driver_profiLED/driver_profiLED.h>
 #include <modules/worker_thread/worker_thread.h>
 #include <common/ctor.h>
@@ -362,3 +363,4 @@ static void led_command_handler(size_t msg_size, const void* buf, void* ctx)
     uavcan_commanded_color.g = msg->commands[0].color.green*4;
     uavcan_commanded_color.b = msg->commands[0].color.blue*8;
 }
+#endif

@@ -1,6 +1,9 @@
 #include "uSD.h"
 #include <common/ctor.h>
 #include <hal.h>
+#include <ch.h>
+
+MEMORYPOOL_DECL(mutex_pool, sizeof(mutex_t), PORT_NATURAL_ALIGN, chCoreAllocAlignedI);
 
 static FATFS filesystem;
 static bool filesystem_ok;
@@ -48,7 +51,6 @@ RUN_AFTER(CH_SYS_INIT) {
     filesystem_ok = true;
 }
 
-
 FATFS* uSD_get_filesystem(void) {
     if (!filesystem_ok) {
         return NULL;
@@ -56,3 +58,28 @@ FATFS* uSD_get_filesystem(void) {
 
     return &filesystem;
 }
+
+
+// int ff_cre_syncobj (BYTE vol, FF_SYNC_t *sobj) {
+//     *sobj = chPoolAlloc(&mutex_pool);
+//     if (*sobj) {
+//         chMtxObjectInit(*sobj);
+//         return 1;
+//     }
+//     return 0;
+// }
+//
+// int ff_del_syncobj(FF_SYNC_t sobj) {
+//     chPoolFree(&mutex_pool, sobj);
+//     return 1;
+// }
+//
+// int ff_req_grant(FF_SYNC_t sobj) {
+//     chMtxLock(sobj);
+//     return 1;
+// }
+//
+// void ff_rel_grant(FF_SYNC_t sobj)
+// {
+//     chMtxUnlock(sobj);
+// }

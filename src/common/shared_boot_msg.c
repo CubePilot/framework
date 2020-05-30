@@ -1,6 +1,7 @@
 #include <common/shared_boot_msg.h>
 #include <common/crc64_we.h>
 #include <string.h>
+#include <ch.h>
 
 #define SHARED_MSG_MAGIC 0xDEADBEEF
 
@@ -13,10 +14,11 @@ struct shared_msg_header_s {
 struct shared_msg_s {
     struct shared_msg_header_s header;
     union shared_msg_payload_u payload;
+    uint32_t dummy;
 } SHARED_MSG_PACKED;
 
 // NOTE: _app_bl_shared_sec symbol shall be defined by the ld script
-extern struct shared_msg_s _app_bl_shared_sec;
+extern volatile struct shared_msg_s _app_bl_shared_sec;
 
 static int16_t get_payload_length(enum shared_msg_t msgid) {
     switch(msgid) {
@@ -71,8 +73,13 @@ void shared_msg_finalize_and_write(enum shared_msg_t msgid, const union shared_m
     memcpy(&_app_bl_shared_sec.payload, msg_payload, sizeof(union shared_msg_payload_u));
     _app_bl_shared_sec.header.magic = SHARED_MSG_MAGIC;
     _app_bl_shared_sec.header.crc64 = compute_mailbox_crc64(get_payload_length(msgid));
+
+    // STM32H7 reference manual: when an incomplete word is written to an internal SRAM and a reset occurs, the last incomplete word is not really written. This is due to the ECC behavior. To ensure that an incomplete word is written to SRAM, write an additional dummy incomplete word to the same RAM at a different address before issuing a reset.
+    _app_bl_shared_sec.dummy = SHARED_MSG_MAGIC;
+    SCB_CleanInvalidateDCache();
 }
 
 void shared_msg_clear(void) {
     memset(&_app_bl_shared_sec, 0, sizeof(_app_bl_shared_sec));
+    SCB_CleanInvalidateDCache();
 }

@@ -253,9 +253,7 @@ static uint8_t _uavcan_get_node_id(struct uavcan_instance_s* instance) {
         return 0;
     }
 
-    chSysLock();
     uint8_t ret = canardGetLocalNodeID(&instance->canard);
-    chSysUnlock();
     return ret;
 }
 
@@ -353,7 +351,7 @@ static void __attribute__((optimize("O3"))) uavcan_transmit_chunk_handler(uint8_
     }
 }
 
-static bool _uavcan_send(struct uavcan_instance_s* instance, const struct uavcan_message_descriptor_s* const msg_descriptor, uint16_t data_type_id, uint8_t priority, uint8_t transfer_id, uint8_t dest_node_id, void* msg_data, systime_t timeout, struct pubsub_topic_s* completion_topic) {
+static bool _uavcan_send(struct uavcan_instance_s* instance, const struct uavcan_message_descriptor_s* const msg_descriptor, uint16_t data_type_id, uint8_t priority, uint8_t transfer_id, uint8_t dest_node_id, const void* msg_data, systime_t timeout, struct pubsub_topic_s* completion_topic) {
     if (!instance || !msg_descriptor || !msg_descriptor->serializer_func) {
         return false;
     }
@@ -448,7 +446,7 @@ static bool _uavcan_send(struct uavcan_instance_s* instance, const struct uavcan
     return true;
 }
 
-bool uavcan_broadcast_with_callback(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, void* msg_data, systime_t timeout, struct pubsub_topic_s* completion_topic) {
+bool uavcan_broadcast_with_callback(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, const void* msg_data, systime_t timeout, struct pubsub_topic_s* completion_topic) {
     struct uavcan_instance_s* instance = uavcan_get_instance(uavcan_idx);
     if (!instance) {
         return false;
@@ -466,11 +464,11 @@ bool uavcan_broadcast_with_callback(uint8_t uavcan_idx, const struct uavcan_mess
     }
 }
 
-bool uavcan_broadcast(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, void* msg_data) {
+bool uavcan_broadcast(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, const void* msg_data) {
     return uavcan_broadcast_with_callback(uavcan_idx, msg_descriptor, priority, msg_data, chTimeS2I(2), NULL);
 }
 
-uint8_t uavcan_request(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, uint8_t dest_node_id, void* msg_data) {
+uint8_t uavcan_request(uint8_t uavcan_idx, const struct uavcan_message_descriptor_s* const msg_descriptor, uint8_t priority, uint8_t dest_node_id, const void* msg_data) {
     struct uavcan_instance_s* instance = uavcan_get_instance(uavcan_idx);
     if (!instance) {
         return (uint8_t)-1;
@@ -489,7 +487,7 @@ uint8_t uavcan_request(uint8_t uavcan_idx, const struct uavcan_message_descripto
     }
 }
 
-bool uavcan_respond(uint8_t uavcan_idx, const struct uavcan_deserialized_message_s* const req_msg, void* msg_data) {
+bool uavcan_respond(uint8_t uavcan_idx, const struct uavcan_deserialized_message_s* const req_msg, const void* msg_data) {
     struct uavcan_instance_s* instance = uavcan_get_instance(uavcan_idx);
     if (!instance) {
         return false;

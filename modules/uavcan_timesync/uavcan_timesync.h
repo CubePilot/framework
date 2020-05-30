@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <ch.h>
 
 uint64_t uavcan_timesync_get_bus_time_at_systime(systime_t systime);

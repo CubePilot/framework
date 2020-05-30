@@ -24,7 +24,7 @@ const struct uavcan_protocol_NodeStatus_s* uavcan_nodestatus_publisher_get_nodes
 RUN_AFTER(UAVCAN_INIT) {
     node_status.uptime_sec = 0;
     node_status.health = UAVCAN_PROTOCOL_NODESTATUS_HEALTH_OK;
-    node_status.mode = UAVCAN_PROTOCOL_NODESTATUS_MODE_OPERATIONAL;
+    node_status.mode = UAVCAN_PROTOCOL_NODESTATUS_MODE_INITIALIZATION;
     node_status.sub_mode = 0;
     node_status.vendor_specific_status_code = 0;
 

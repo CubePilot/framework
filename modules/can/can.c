@@ -6,6 +6,7 @@
 #include <common/helpers.h>
 #include <modules/pubsub/pubsub.h>
 #include <modules/worker_thread/worker_thread.h>
+#include <ch.h>
 
 #ifndef CAN_TRX_WORKER_THREAD
 #error Please define CAN_TRX_WORKER_THREAD in framework_conf.h.
@@ -29,6 +30,7 @@ WORKER_THREAD_DECLARE_EXTERN(WT_EXPIRE)
 #endif
 
 #define MAX_NUM_TX_MAILBOXES 3
+
 
 enum can_tx_mailbox_state_t {
     CAN_TX_MAILBOX_EMPTY,
@@ -66,7 +68,6 @@ struct can_instance_s {
     struct can_tx_queue_s tx_queue;
     struct pubsub_topic_s rx_topic;
 
-    memory_pool_t filter_list_pool;
     struct filter_list_element_s* filter_list_head;
     bool filtering_enabled;
 
@@ -85,6 +86,7 @@ struct can_instance_s {
     struct can_instance_s* next;
 };
 
+MEMORYPOOL_DECL(filter_list_pool, sizeof(struct filter_list_element_s), PORT_NATURAL_ALIGN, chCoreAllocAlignedI);
 MEMORYPOOL_DECL(can_instance_pool, sizeof(struct can_instance_s), PORT_NATURAL_ALIGN, chCoreAllocAlignedI);
 
 static struct can_instance_s* can_instance_list_head;
@@ -113,7 +115,7 @@ void can_add_filter(struct can_instance_s* instance, uint32_t mask, uint32_t mat
         chSysUnlock();
         return;
     }
-    struct filter_list_element_s* new_element = chPoolAllocI(&instance->filter_list_pool);
+    struct filter_list_element_s* new_element = chPoolAllocI(&filter_list_pool);
     if (new_element == NULL) {
         chSysUnlock();
         return;
@@ -483,7 +485,7 @@ struct can_instance_s* can_driver_register(uint8_t can_idx, void* driver_ctx, co
     }
     instance->num_tx_mailboxes = num_tx_mailboxes;
 
-    chPoolObjectInit(&instance->filter_list_pool, sizeof(struct filter_list_element_s), chCoreAllocI);
+    chPoolObjectInit(&filter_list_pool, sizeof(struct filter_list_element_s), chCoreAllocAlignedI);
     instance->filter_list_head = NULL;
     instance->filtering_enabled = true;
     

@@ -7,7 +7,7 @@
 #include <string.h>
 
 @[  if msg_default_dtid is not None]@
-static void encode_func(void* msg, uavcan_serializer_chunk_cb_ptr_t chunk_cb, void* ctx) {
+static void encode_func(const void* msg, uavcan_serializer_chunk_cb_ptr_t chunk_cb, void* ctx) {
     encode_@(msg_underscored_name)(msg, chunk_cb, ctx);
 }
 
@@ -37,7 +37,7 @@ const struct uavcan_message_descriptor_s @(msg_underscored_name)_descriptor = {
 };
 @[  end if]@
 
-void encode_@(msg_underscored_name)(@(msg_c_type)* msg, uavcan_serializer_chunk_cb_ptr_t chunk_cb, void* ctx) {
+void encode_@(msg_underscored_name)(const @(msg_c_type)* msg, uavcan_serializer_chunk_cb_ptr_t chunk_cb, void* ctx) {
     uint8_t buffer[8];
     _encode_@(msg_underscored_name)(buffer, msg, chunk_cb, ctx, true);
 }
@@ -48,7 +48,7 @@ uint32_t decode_@(msg_underscored_name)(const CanardRxTransfer* transfer, @(msg_
     return (bit_ofs+7)/8;
 }
 
-void _encode_@(msg_underscored_name)(uint8_t* buffer, @(msg_c_type)* msg, uavcan_serializer_chunk_cb_ptr_t chunk_cb, void* ctx, bool tao) {
+void _encode_@(msg_underscored_name)(uint8_t* buffer, const @(msg_c_type)* msg, uavcan_serializer_chunk_cb_ptr_t chunk_cb, void* ctx, bool tao) {
 @{indent += 1}@{ind = '    '*indent}@
 @(ind)(void)buffer;
 @(ind)(void)msg;
