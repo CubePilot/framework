@@ -22,7 +22,7 @@
 #define RX_FIFO_DEPTH 3
 
 static void can_driver_stm32_start(void* ctx, bool silent, bool auto_retransmit, uint32_t baudrate);
-static void can_driver_stm32_stop(void* ctx)
+static void can_driver_stm32_stop(void* ctx);
 bool can_driver_stm32_abort_tx_mailbox_I(void* ctx, uint8_t mb_idx);
 bool can_driver_stm32_load_tx_mailbox_I(void* ctx, uint8_t mb_idx, struct can_frame_s* frame);
 
