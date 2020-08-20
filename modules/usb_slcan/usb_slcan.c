@@ -74,7 +74,7 @@ static void process_slcan_cmd(struct slcan_instance_s* instance, size_t cmd_len)
     // Unsupported commands that are just ACKed
     switch(instance->cmd_buf[0]) {
         case 'C': // Close CAN channel
-            can_set_filtering_enabled(instance.can_instance, true);
+            can_set_filtering_enabled(instance->can_instance, true);
         case 'S': // Set bitrate
         case 'M':
         case 'm': {
@@ -89,19 +89,19 @@ static void process_slcan_cmd(struct slcan_instance_s* instance, size_t cmd_len)
     switch(instance->cmd_buf[0]) {
         case 'L': { // Open CAN channel in silent mode
             instance->loopback_enable = false;
-            can_set_filtering_enabled(instance.can_instance, false);
+            can_set_filtering_enabled(instance->can_instance, false);
             chnWriteTimeout(&SDU1, (uint8_t*)"\r", 1, TIME_IMMEDIATE);
             return;
         }
         case 'O': { // Open CAN channel in normal mode
             instance->loopback_enable = false;
-            can_set_filtering_enabled(instance.can_instance, false);
+            can_set_filtering_enabled(instance->can_instance, false);
             chnWriteTimeout(&SDU1, (uint8_t*)"\r", 1, TIME_IMMEDIATE);
             return;
         }
         case 'l': {
             instance->loopback_enable = true;
-            can_set_filtering_enabled(instance.can_instance, false);
+            can_set_filtering_enabled(instance->can_instance, false);
             chnWriteTimeout(&SDU1, (uint8_t*)"\r", 1, TIME_IMMEDIATE);
             return;
         }
