@@ -3,16 +3,16 @@ ifeq ($(USE_OPT),)
   USE_OPT = -Os
 endif
 
-override USE_OPT += -Wl,--wrap=log10f -Wl,--wrap=_impure_ptr -ggdb -std=gnu99 --specs=nosys.specs --specs=nano.specs -Werror=double-promotion -ffast-math
+override USE_OPT += -Wl,--wrap=log10f -ggdb --specs=nosys.specs --specs=nano.specs -ffast-math
 
 # C specific options here (added to USE_OPT).
 ifeq ($(USE_COPT),)
-  USE_COPT =
+  USE_COPT = -std=gnu99
 endif
 
 # C++ specific options here (added to USE_OPT).
 ifeq ($(USE_CPPOPT),)
-  USE_CPPOPT = -fno-rtti
+  USE_CPPOPT = -fno-rtti -fno-exceptions -fno-threadsafe-statics -std=c++11
 endif
 
 # Enable this if you want the linker to remove unused code and data
