@@ -75,11 +75,16 @@ void shared_msg_finalize_and_write(enum shared_msg_t msgid, const union shared_m
     _app_bl_shared_sec.header.crc64 = compute_mailbox_crc64(get_payload_length(msgid));
 
     // STM32H7 reference manual: when an incomplete word is written to an internal SRAM and a reset occurs, the last incomplete word is not really written. This is due to the ECC behavior. To ensure that an incomplete word is written to SRAM, write an additional dummy incomplete word to the same RAM at a different address before issuing a reset.
+
     _app_bl_shared_sec.dummy = SHARED_MSG_MAGIC;
+#if !defined(STM32F4)
     SCB_CleanInvalidateDCache();
+#endif
 }
 
 void shared_msg_clear(void) {
     memset(&_app_bl_shared_sec, 0, sizeof(_app_bl_shared_sec));
+#if !defined(STM32F4)
     SCB_CleanInvalidateDCache();
+#endif
 }
