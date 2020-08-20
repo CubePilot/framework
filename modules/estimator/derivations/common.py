@@ -24,13 +24,15 @@ def get_state_index(state_symbol):
             return i
     return None
 
-est_quat = Matrix(symbols('quat.coeffs()((0:4))', real=True))
+est_quat = Matrix(symbols('quat.w() quat.x() quat.y() quat.z()', real=True))
 rot_err = add_states('rot_err', 3)
 gbias = add_states('gbias', 3)
 gscale = add_states('gscale', 3)
 abias = add_states('abias', 3)
 pos = add_states('pos', 3)
 vel = add_states('vel', 3)
+magb = add_states('magb', 3)
+mage = add_states('mage', 3)
 
 n_states = len(x)
 
@@ -41,3 +43,28 @@ for i in range(n_states):
 
 err_quat = gibbs_to_quat(rot_err)
 Tbn = quat_to_matrix(quat_multiply(est_quat, err_quat))
+
+def derive_zero_rot_err(_x, _P):
+    _P = copy_upper_to_lower_offdiagonals(_P)
+    del_gibbs = Matrix(symbols('del_gibbs((0:3))', real=True))
+    #err_quat = gibbs_to_quat(rot_err)
+    rotErrNew = gibbs_multiply(-del_gibbs, rot_err)
+
+    f = x[:,:]
+    f[0:3,:] = rotErrNew
+    assert f.shape == x.shape
+
+    F = f.jacobian(x)
+
+    soln = solve(rotErrNew, del_gibbs, dict=True)[0]
+    f = f.xreplace(soln).xreplace(dict(zip(x, _x)))
+    F = F.xreplace(soln).xreplace(dict(zip(x, _x)))
+    del_quat = gibbs_to_quat(del_gibbs).xreplace(soln).xreplace(dict(zip(x, _x)))
+
+    quat_n = quat_multiply(est_quat,del_quat)
+    x_n = f
+    P_n = F*_P*F.T
+
+    P_n = copy_upper_to_lower_offdiagonals(P_n)
+
+    return quat_n, x_n, P_n

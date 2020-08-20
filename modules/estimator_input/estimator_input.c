@@ -8,7 +8,7 @@
 
 MEMORYPOOL_DECL(input_port_pool, sizeof(struct estimator_input_port_s), PORT_NATURAL_ALIGN, chCoreAllocAlignedI);
 
-static void reschedule_I(struct estimator_input_s* instance) {
+static void reschedule_S(struct estimator_input_s* instance) {
     systime_t tnow_ticks = chVTGetSystemTimeX();
     systime_t tdelay = TIME_INFINITE;
 
@@ -21,7 +21,7 @@ static void reschedule_I(struct estimator_input_s* instance) {
         }
     }
 
-    worker_thread_timer_task_reschedule_I(instance->worker_thread, &instance->process_measurements_task, tdelay);
+    worker_thread_timer_task_reschedule_S(instance->worker_thread, &instance->process_measurements_task, tdelay);
 }
 
 static void process_measurements_task_func(struct worker_thread_timer_task_s* task) {
@@ -31,7 +31,7 @@ static void process_measurements_task_func(struct worker_thread_timer_task_s* ta
 
     if (!instance->oldest_element) {
         chSysLock();
-        reschedule_I(instance);
+        reschedule_S(instance);
         chSysUnlock();
         return;
     }
@@ -40,7 +40,7 @@ static void process_measurements_task_func(struct worker_thread_timer_task_s* ta
 
     if (oldest_meas_age < instance->estimator_delay_us) {
         chSysLock();
-        reschedule_I(instance);
+        reschedule_S(instance);
         chSysUnlock();
         return;
     }
@@ -53,7 +53,7 @@ static void process_measurements_task_func(struct worker_thread_timer_task_s* ta
     struct delay_buffer_element_s* delete_ptr = instance->oldest_element;
 //     instance->oldest_element->port->oldest_element = instance->oldest_element->next_in_port;
     instance->oldest_element = instance->oldest_element->next;
-    reschedule_I(instance);
+    reschedule_S(instance);
     chSysUnlock();
     chHeapFree(delete_ptr);
 
@@ -77,30 +77,12 @@ static void insert_into_main_list_I(struct estimator_input_s* instance, struct d
     *insert_ptr = new_element;
 }
 
-// static void insert_into_port_list_I(struct estimator_input_port_s* port, struct delay_buffer_element_s* new_element) {
-//     struct delay_buffer_element_s** insert_ptr = &port->oldest_element;
-//     systime_t tnow_ticks = chVTGetSystemTimeX();
-//     while (*insert_ptr && tnow_ticks-(*insert_ptr)->meas.meas_time > tnow_ticks-new_element->meas.meas_time) {
-//         *insert_ptr = (*insert_ptr)->next_in_port;
-//     }
-//
-//     if (*insert_ptr) {
-//         new_element->next = (*insert_ptr)->next;
-//     } else {
-//         new_element->next = NULL;
-//     }
-//
-//     *insert_ptr = new_element;
-// }
-
 static void sensor_msg_listener_func(size_t msg_size, const void* buf, void* ctx) {
 
 
     struct estimator_input_port_s* port = ctx;
     struct estimator_input_s* instance = port->instance;
     const struct sensor_measurement_s* meas = buf;
-
-//     uavcan_send_debug_msg(UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_DEBUG, "", "type %u", (unsigned)meas->type);
 
     systime_t tnow_ticks = chVTGetSystemTimeX();
 
@@ -135,7 +117,7 @@ static void sensor_msg_listener_func(size_t msg_size, const void* buf, void* ctx
     chSysLock();
     insert_into_main_list_I(instance, new_element);
 //     insert_into_port_list_I(port, new_element);
-    reschedule_I(instance);
+    reschedule_S(instance);
     chSysUnlock();
 
 }

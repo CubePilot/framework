@@ -102,11 +102,20 @@ struct sensor_writer_func_ctx_s {
     void* ctx;
 };
 
+#include <modules/uavcan_debug/uavcan_debug.h>
+
+static uint32_t msg_addr;
+static uint32_t msg_type;
+static uint32_t _msg_size;
+
 static void sensor_writer_func(size_t msg_size, void* msg, void* ctx) {
     struct sensor_writer_func_ctx_s* ctx2 = ctx;
     struct sensor_measurement_s* meas = msg;
     meas->type = ctx2->meas_type;
     meas->meas_time = ctx2->meas_time;
+    msg_type = meas->type;
+    msg_addr = (uint32_t)msg;
+    _msg_size = msg_size-offsetof(struct sensor_measurement_s, msg_body);
     ctx2->writer_func(msg_size-offsetof(struct sensor_measurement_s, msg_body), meas->msg_body, ctx2->ctx);
 }
 

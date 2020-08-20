@@ -17,16 +17,22 @@ gyro_sigma = Symbol('gyro_sigma', real=True, nonnegative=True)
 accel_scale_sigma = Symbol('accel_scale_sigma', real=True, nonnegative=True)
 gyro_cross_sigma = Symbol('gyro_cross_sigma', real=True, nonnegative=True)
 accel_cross_sigma = Symbol('accel_cross_sigma', real=True, nonnegative=True)
+gravity_vec = Matrix(symbols('gravity_vec((0:3))', real=True))
 
-del_ang_corrected = del_ang.multiply_elementwise(gscale+ones(3,1))-gbias*dt
+earth_omega_body = Tbn.T*Matrix([0,0,7.2921159e-5])
+
+del_ang_corrected = del_ang.multiply_elementwise(gscale+ones(3,1))-gbias*dt - earth_omega_body*dt
 del_vel_corrected = del_vel-abias*dt
-del_vel_coordinate_ned = Tbn*del_vel_corrected+Matrix([0,0,9.80655])*dt
+del_vel_coordinate_ned = Tbn*del_vel_corrected+gravity_vec*dt
 
 rot_err_new_approx = quat_to_gibbs(quat_rotate_approx(err_quat, del_ang_corrected))
 rot_err_new = quat_to_gibbs(quat_rotate(err_quat, del_ang_corrected))
 
+#pprint(rot_err_new.xreplace(dict(zip(del_ang_corrected, symbols('del_ang_corrected((0:3))',real=True))+zip(rot_err, zeros(3,1))))[0])
+
 # f: state-transtition model for the purpose of linearization
-f = Matrix([rot_err_new_approx, gbias, gscale, abias, pos+vel*dt, vel+del_vel_coordinate_ned])
+f = Matrix([rot_err_new_approx, gbias, gscale, abias, pos+vel*dt, vel+del_vel_coordinate_ned, magb, mage])
+
 F = f.jacobian(x)
 
 # u: control input vector
@@ -67,38 +73,52 @@ f[0:3,:] = rot_err_new
 
 f = f.xreplace(dict(zip(rot_err, zeros(3,1))))
 F = F.xreplace(dict(zip(rot_err, zeros(3,1))))
+Q = Q.xreplace(dict(zip(rot_err, zeros(3,1))))
+
+P_n = F*P*F.T+Q
+
+pprint(f)
+P_n = copy_upper_to_lower_offdiagonals(P_n)
+quat_n, f, P_n = derive_zero_rot_err(f,P_n)
+P_n = copy_upper_to_lower_offdiagonals(P_n)
+
+pprint(f)
 
 # Generate C code for prediction model
-f, subx = extractSubexpressions([f], 'subx', threshold=4)
+quat_n, x_n, P_n, subx = extractSubexpressions([quat_n, f, P_n], 'subx', threshold=4)
 
 print '{ //////// Begin generated code: Prediction model      ////////'
 for i in range(len(subx)):
-    print '    float %s = %s;' % (subx[i][0], ccode_double(subx[i][1]))
+    print '    float %s = %s;' % (subx[i][0], ccode_float(subx[i][1]))
 
 print ''
 
-for i in range(len(f)):
-    print '    f(%u,0) = %s;' % (i, ccode_double(f[i]))
+for i in range(len(x_n)):
+    print '    x_n(%u,0) = %s;' % (i, ccode_float(x_n[i]))
 
 print ''
 
-for i in range(F.rows):
-    for j in range(F.cols):
-        if F[i,j] != 0:
-            print '    F(%u,%u) = %s;' % (i, j, ccode_double(F[i,j]))
+for i in range(P_n.rows):
+    for j in range(P_n.cols):
+        print '    P_n(%u,%u) = %s;' % (i, j, ccode_float(P_n[i,j]))
+
+print ''
+
+for i in range(len(quat_n)):
+    print '    quat_n.%s() = %s;' % ('wxyz'[i], ccode_float(quat_n[i]))
 print '} //////// End generated code: Prediction model        ////////\n'
 
-# Generate C code for prediction model
-Q, subx = extractSubexpressions([Q], 'subx', threshold=4)
+## Generate C code for prediction model
+#Q, subx = extractSubexpressions([Q], 'subx', threshold=4)
 
-print '{ //////// Begin generated code: Process noise         ////////'
-for i in range(len(subx)):
-    print '    float %s = %s;' % (subx[i][0], ccode_double(subx[i][1]))
+#print '{ //////// Begin generated code: Process noise         ////////'
+#for i in range(len(subx)):
+    #print '    float %s = %s;' % (subx[i][0], ccode_float(subx[i][1]))
 
-print ''
+#print ''
 
-for i in range(Q.rows):
-    for j in range(Q.cols):
-        if Q[i,j] != 0:
-            print '    P(%u,%u) += %s;' % (i, j, ccode_double(Q[i,j]))
-print '} //////// End generated code: Process noise           ////////\n'
+#for i in range(Q.rows):
+    #for j in range(Q.cols):
+        #if Q[i,j] != 0:
+            #print '    P(%u,%u) += %s;' % (i, j, ccode_float(Q[i,j]))
+#print '} //////// End generated code: Process noise           ////////\n'

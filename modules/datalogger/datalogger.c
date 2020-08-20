@@ -23,6 +23,7 @@ RUN_ON(PUBSUB_TOPIC_INIT) {
 void logger_start_log(struct logfile_s* logfile, const char* name) {
     logfile->writer_list_head = NULL;
     logfile->open_res = f_open(&logfile->fp, name, FA_CREATE_ALWAYS | FA_WRITE);
+    f_truncate(&logfile->fp);
 
 }
 
@@ -36,8 +37,9 @@ void logger_subscribe(struct logfile_s* logfile, struct pubsub_topic_s* topic) {
 }
 
 static void log_msg_handler(size_t msg_size, const void* buf, void* ctx) {
-    // TODO: this listener may block for too long. Should copy to buffer?
     struct log_writer_s* writer = ctx;
+//     uavcan_send_debug_msg(UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_DEBUG, "sub", "type %u %08X", *(unsigned*)buf, (unsigned)buf);
+
 
     uint16_t crc16 = crc16_ccitt(buf, msg_size, 0);
 
@@ -46,6 +48,8 @@ static void log_msg_handler(size_t msg_size, const void* buf, void* ctx) {
     res = f_write(&writer->logfile->fp, &msg_size, sizeof(msg_size), &bw);
     res = f_write(&writer->logfile->fp, &crc16, 2, &bw);
     res = f_write(&writer->logfile->fp, buf, msg_size, &bw);
+
+
 
 
 //     const uint8_t* next_byte = buf;
@@ -60,6 +64,6 @@ static void log_msg_handler(size_t msg_size, const void* buf, void* ctx) {
 //         res = f_write(&writer->logfile->fp, encoded, encoded_len, &bw);
 //     }
 //     res = f_write(&writer->logfile->fp, "\xC0", 1, &bw);
-    res = f_sync(&writer->logfile->fp);
+//     res = f_sync(&writer->logfile->fp);
 
 }

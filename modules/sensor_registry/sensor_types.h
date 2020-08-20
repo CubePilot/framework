@@ -35,7 +35,7 @@ enum sensor_measurement_type_t {
 }
 
 struct sensor_measurement_s {
-    enum sensor_measurement_type_t type;
+    uint32_t type;
     systime_t meas_time;
     uint8_t msg_body[];
 };

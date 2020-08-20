@@ -1,6 +1,6 @@
 from common import *
 
-new_quat_sym = Matrix(symbols('new_quat.coeffs()((0:4))',real=True))
+new_quat_sym = Matrix(symbols('new_quat.w() new_quat.x() new_quat.y() new_quat.z()',real=True))
 
 
 del_gibbs = Matrix(symbols('del_gibbs((0:3))', real=True))
@@ -13,8 +13,6 @@ F = f.jacobian(x)
 
 del_quat_sym = Matrix(symbols('del_quat((0:4))',real=True))
 subs = solve(quat_multiply(est_quat,del_quat_sym)-new_quat_sym, del_quat_sym)
-
-
 
 del_quat = del_quat_sym.xreplace(subs)
 subs.update(dict(zip(del_gibbs, quat_to_gibbs(del_quat))))

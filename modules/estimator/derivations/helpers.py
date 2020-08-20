@@ -38,6 +38,13 @@ class C99CodePrinterTweaked(C99CodePrinter):
                 "ceiling": "ceilf",
             }
 
+        #ieee_funcs = ['pow', 'powf', 'sqrt', 'sqrtf', 'exp', 'expf', 'asin', 'asinf']
+
+        #for key, fname in self.known_functions.iteritems():
+            #if fname in ieee_funcs:
+                #self.known_functions[key] = '__ieee754_'+fname
+
+
     def _print_Pow(self, expr):
         if "Pow" in self.known_functions:
             return self._print_Function(expr)
@@ -96,6 +103,12 @@ class C99CodePrinterTweaked(C99CodePrinter):
             last_line = ": ( %s )" % self._print(expr.args[-1].expr)
             return ": ".join(ecpairs) + last_line + " ".join([")"*len(ecpairs)])
 
+    def _print_Float(self,flt):
+        ret = C99CodePrinter._print_Float(self,flt)
+        if self.float_precision == 'single':
+            return ret+'f'
+        return ret
+
     def _print_Rational(self, expr):
         p, q = int(expr.p), int(expr.q)
         if self.float_precision == 'single':
@@ -119,19 +132,22 @@ def skew(_v):
         [-v[1], v[0], 0]
     ])
 
+def euler_from_matrix(m):
+    return atan2(m[2,1], m[2,2]), -asin(m[2,0]), atan2(m[1,0],m[0,0])
+
 def quat_from_euler(roll, pitch, yaw):
     return Matrix([
-        sin(roll/2) * cos(pitch/2) * cos(yaw/2) + cos(roll/2) * sin(pitch/2) * sin(yaw/2),
+        cos(roll/2) * cos(pitch/2) * cos(yaw/2) + sin(roll/2) * sin(pitch/2) * sin(yaw/2),
+        sin(roll/2) * cos(pitch/2) * cos(yaw/2) - cos(roll/2) * sin(pitch/2) * sin(yaw/2),
         cos(roll/2) * sin(pitch/2) * cos(yaw/2) + sin(roll/2) * cos(pitch/2) * sin(yaw/2),
-        cos(roll/2) * cos(pitch/2) * sin(yaw/2) + sin(roll/2) * sin(pitch/2) * cos(yaw/2),
-        cos(roll/2) * cos(pitch/2) * cos(yaw/2) + sin(roll/2) * sin(pitch/2) * sin(yaw/2)
+        cos(roll/2) * cos(pitch/2) * sin(yaw/2) - sin(roll/2) * sin(pitch/2) * cos(yaw/2)
         ])
 
 def quat_to_euler(q):
-    qi = q[0]
-    qj = q[1]
-    qk = q[2]
-    qr = q[3]
+    qr = q[0]
+    qi = q[1]
+    qj = q[2]
+    qk = q[3]
 
     return Matrix([
         atan2(2*(qr*qi+qj*qk), 1-2*(qi**2+qj**2)),
@@ -146,21 +162,30 @@ def toVec(*args):
     ret = Matrix(map(lambda x: Matrix([x]), args)).vec()
     return ret
 
+def Rx(theta):
+    return Matrix([[1, 0, 0],
+                   [0,cos(theta), -sin(theta)],
+                   [0,sin(theta),cos(theta)]])
+
+def Ry(theta):
+    return Matrix([[cos(theta), 0, sin(theta)],[0, 1, 0],[-sin(theta), 0, cos(theta)]])
+
 def Rz(theta):
     return Matrix([[cos(theta), -sin(theta), 0],[sin(theta),cos(theta), 0], [0,0,1]])
 
 def quat_to_gibbs(_q):
     q = toVec(_q)
-    return q[0:3,:] / q[3]
+    return q[1:4,:] / q[0]
 
 def gibbs_to_quat(_g):
     g = toVec(_g)
     assert g.rows == 3
+
     return Matrix([
-        [-g[0]/sqrt(g[0]**2 + g[1]**2 + g[2]**2 + 1)],
-        [-g[1]/sqrt(g[0]**2 + g[1]**2 + g[2]**2 + 1)],
-        [-g[2]/sqrt(g[0]**2 + g[1]**2 + g[2]**2 + 1)],
-        [   -1/sqrt(g[0]**2 + g[1]**2 + g[2]**2 + 1)]
+        [   1/sqrt(g[0]**2 + g[1]**2 + g[2]**2 + 1)],
+        [g[0]/sqrt(g[0]**2 + g[1]**2 + g[2]**2 + 1)],
+        [g[1]/sqrt(g[0]**2 + g[1]**2 + g[2]**2 + 1)],
+        [g[2]/sqrt(g[0]**2 + g[1]**2 + g[2]**2 + 1)],
         ])
 
 def gibbs_multiply(g1,g2):
@@ -170,7 +195,23 @@ def rot_vec_to_quat_approx(_v):
     v = toVec(_v)
     assert v.rows == 3
 
-    return toVec(v*Rational(1,2),1)
+    return toVec(1,v*Rational(1,2))
+
+def axis_angle_to_quat(theta, axis):
+    return toVec(cos(theta/2.), sin(theta/2.) * axis[0], sin(theta/2.) * axis[1], sin(theta/2.) * axis[2])
+
+def quat_rotate_axis(q, theta, axis):
+    return quat_multiply(q,axis_angle_to_quat(theta, axis))
+
+def quat_rotate_x(q, theta):
+    return quat_rotate_axis(q, theta, Matrix([1,0,0]))
+
+def quat_rotate_y(q, theta):
+    return quat_rotate_axis(q, theta, Matrix([0,1,0]))
+
+def quat_rotate_z(q, theta):
+    return quat_rotate_axis(q, theta, Matrix([0,0,1]))
+
 
 def quat_rotate(_q, _v):
     return quat_multiply(_q,rot_vec_to_quat(_v))
@@ -178,26 +219,28 @@ def quat_rotate(_q, _v):
 def quat_rotate_approx(_q, _v):
     return quat_multiply(_q,rot_vec_to_quat_approx(_v))
 
+
+
 def rot_vec_to_quat(_v):
     v = toVec(_v)
     assert v.rows == 3
 
     theta = sqrt(v[0]**2+v[1]**2+v[2]**2)
     axis = v/Piecewise((theta, theta>0), (1, True))
-    return toVec(sin(theta/2.) * axis[0], sin(theta/2.) * axis[1], sin(theta/2.) * axis[2], cos(theta/2.))
+    return toVec(cos(theta/2.), sin(theta/2.) * axis[0], sin(theta/2.) * axis[1], sin(theta/2.) * axis[2])
 
 def quat_to_rot_vec_approx(_q):
     q = toVec(_q)
-    return 2.*toVec(q[0],q[1],q[2])
+    return 2.*toVec(q[1],q[2],q[3])
 
 def quat_to_rot_vec(_q):
     q = toVec(_q)
     assert q.rows == 4
 
-    theta = 2*acos(q[3])
-    l = sqrt(q[0]**2+q[1]**2+q[2]**2)
+    theta = 2*acos(q[0])
+    l = sqrt(q[1]**2+q[2]**2+q[3]**2)
 
-    axis = toVec(q[0],q[1],q[2])/Piecewise((l, l>0), (1, True))
+    axis = toVec(q[1],q[2],q[3])/Piecewise((l, l>0), (1, True))
 
     return theta*axis
 
@@ -205,9 +248,9 @@ def quat_inverse(_q):
     q = toVec(_q)
     assert q.rows == 4
 
-    q[0] = -q[0]
     q[1] = -q[1]
     q[2] = -q[2]
+    q[3] = -q[3]
     return q
 
 def quat_normalize(_q):
@@ -221,28 +264,52 @@ def quat_multiply(_q1, _q2):
     q2 = toVec(_q2)
     assert q1.rows == 4 and q2.rows == 4
 
-    q1i = q1[0]
-    q1j = q1[1]
-    q1k = q1[2]
-    q1w = q1[3]
+    q1w = q1[0]
+    q1i = q1[1]
+    q1j = q1[2]
+    q1k = q1[3]
 
-    q2i = q2[0]
-    q2j = q2[1]
-    q2k = q2[2]
-    q2w = q2[3]
+    q2w = q2[0]
+    q2i = q2[1]
+    q2j = q2[2]
+    q2k = q2[3]
 
-    return toVec(q1w*q2i + q1i*q2w + q1j*q2k - q1k*q2j,
+    return toVec(q1w*q2w - q1i*q2i - q1j*q2j - q1k*q2k,
+                 q1w*q2i + q1i*q2w + q1j*q2k - q1k*q2j,
                  q1w*q2j - q1i*q2k + q1j*q2w + q1k*q2i,
-                 q1w*q2k + q1i*q2j - q1j*q2i + q1k*q2w,
-                 q1w*q2w - q1i*q2i - q1j*q2j - q1k*q2k)
+                 q1w*q2k + q1i*q2j - q1j*q2i + q1k*q2w)
 
 def quat_to_matrix(_q):
     q = toVec(_q)
     assert q.rows == 4
 
-    q_vec = q[:-1,0]
-    q_w = q[3]
+    q_vec = q[1:,0]
+    q_w = q[0]
     return (q_w**2-(q_vec.T*q_vec)[0])*eye(3) + 2.*(q_vec*q_vec.T) + 2.*q_w*skew(q_vec)
+
+def quat_from_matrix(m):
+    S = 2*sqrt(m[0,0]+m[1,1]+m[2,2]+1)
+    method1 = Matrix([S/4, (m[2,1] - m[1,2]) / S, (m[0,2] - m[2,0]) / S, (m[1,0] - m[0,1]) / S])
+
+    S = sqrt(1 + m[0,0] - m[1,1] - m[2,2]) * 2
+    method2 = Matrix([(m[2,1] - m[1,2]) / S, S/4, (m[0,1] + m[1,0]) / S, (m[0,2] + m[2,0]) / S])
+
+    S = sqrt(1 + m[1,1] - m[0,0] - m[2,2]) * 2
+    method3 = Matrix([(m[0,2] - m[2,0]) / S, (m[0,1] + m[1,0]) / S, S/4, (m[1,2] + m[2,1]) / S])
+
+    S = sqrt(1 + m[2,2] - m[0,0] - m[1,1]) * 2
+    method4 = Matrix([(m[1,0] - m[0,1]) / S, (m[0,2] + m[2,0]) / S, (m[1,2] + m[2,1]) / S, S/4])
+
+    criteria1 = m[0,0]+m[1,1]+m[2,2] > 0
+    criteria2 = (m[0,0]>m[1,1]) & (m[0,0]>m[2,2])
+    criteria3 = m[1,1] > m[2,2]
+    criteria4 = True
+
+    ret = zeros(4,1)
+    for i in range(4):
+        ret[i] = Piecewise((method1[i], criteria1), (method2[i], criteria2), (method3[i], criteria3), (method4[i], criteria4))
+
+    return ret
 
 def upperTriangularToVec(M):
     assert M.rows == M.cols
@@ -319,7 +386,9 @@ def quickinv_sym(M):
     n = M.rows
     A = Matrix(n,n,symbols('_X[0:%u][0:%u]' % (n,n)))
     A = copy_upper_to_lower_offdiagonals(A)
-    B = Matrix(simplify(A.inv()))
+    B = simplify(Matrix(A.cholesky_solve(eye(A.rows,A.cols))))
+    B = copy_upper_to_lower_offdiagonals(B)
+
     return B.xreplace(dict(zip(A,M)))
 
 def wrap_pi(x):
@@ -355,3 +424,116 @@ def UDUdecomposition(M):
         U[i,i] = 1
 
     return U,D
+
+def ecef2lla(pos_ecef):
+    # Michael Kleder (2020). Convert Cartesian (ECEF) Coordinates to lat, lon, alt (https://www.mathworks.com/matlabcentral/fileexchange/7941-convert-cartesian-ecef-coordinates-to-lat-lon-alt), MATLAB Central File Exchange. Retrieved May 30, 2020.
+    x = pos_ecef[0]
+    y = pos_ecef[1]
+    z = pos_ecef[2]
+
+    a = 6378137
+    e = 8.1819190842622e-2
+
+    # calculations:
+    b   = sqrt(a**2*(1-e**2))
+    ep  = sqrt((a**2-b**2)/b**2)
+    p   = sqrt(x**2+y**2)
+    th  = atan2(a*z,b*p)
+    lon = atan2(y,x)
+    lat = atan2((z+ep**2*b*sin(th)**3),(p-e**2*a*cos(th)**3))
+    N   = a/sqrt(1-e**2*sin(lat)**2)
+    alt = p/cos(lat)-N
+
+
+    # correct for numerical instability in altitude near exact poles:
+    # (after this correction, error is about 2 millimeters, which is about
+    # the same as the numerical precision of the overall function)
+
+    alt = Piecewise((alt, (abs(x)>1) & (abs(y)>1)), (abs(z)-b, True))
+
+    return lat, lon, alt
+
+def lla2ecef(lat, lon, alt):
+    # Michael Kleder (2020). Covert lat, lon, alt to ECEF Cartesian (https://www.mathworks.com/matlabcentral/fileexchange/7942-covert-lat-lon-alt-to-ecef-cartesian), MATLAB Central File Exchange. Retrieved May 30, 2020.
+    a = 6378137
+    e = 8.181919084261345e-2
+    e_sq = e**2
+    b_sq = a**2*(1 - e_sq)
+
+    N = a/sqrt(1 - e_sq*sin(lat)**2)
+    x = (N+alt)*cos(lat)*cos(lon)
+    y = (N+alt)*cos(lat)*sin(lon)
+    z = ((b_sq/a**2)*N+alt)*sin(lat)
+
+    return Matrix([x,y,z])
+
+def rotation_ecef_to_ned_from_lat_lon(lat, lon):
+    return Matrix([[-sin(lat)*cos(lon), -sin(lon), -cos(lat)*cos(lon)],
+                   [-sin(lat)*sin(lon), cos(lon), -cos(lat)*sin(lon)],
+                   [cos(lat), 0, -sin(lat)]
+                   ])
+
+
+def quat_ecef_to_ned_from_lat_lon(lat, lon):
+    return quat_rotate_y(quat_rotate_x(quat_rotate_y(Matrix([1,0,0,0]), -pi/2), lon), -lat)
+
+def quat_ecef_to_ned_from_ecef(pos_ecef):
+    lat, lon, alt = ecef2lla(pos_ecef)
+    return quat_rotate_y(quat_rotate_x(quat_rotate_y(Matrix([1,0,0,0]), -pi/2), lon), -lat)
+
+def rotation_ecef_to_ned_from_ecef(pos_ecef):
+    lat, lon, alt = ecef2lla(pos_ecef)
+    return rotation_ecef_to_ned_from_lat_lon(lat, lon)
+
+def gravitation_ecef(pos_ecef):
+    earth_omega = Matrix([0,0,7.2921159e-5])
+
+    x = pos_ecef[0]
+    y = pos_ecef[1]
+    z = pos_ecef[2]
+
+    J2 = .00108263
+    mu = 3.986004418e14
+    R = 6378137
+    r = sqrt(x**2+y**2+z**2)
+    sub1 = 1.5*J2*(R/r)**2
+    sub2 = 5*z**2/r**2
+    sub3 = -mu/r**3
+    sub4 = sub3*(1-sub1*(sub2-1))
+
+    return Matrix([x * sub4,
+                   y * sub4,
+                   z * sub3*(1-sub1*(sub2-3))])
+
+def coriolis_ecef(vel_ecef):
+    omega = Matrix([0,0,7.2921159e-5])
+    coriolis = -2*omega.cross(vel_ecef)
+    return coriolis
+
+def centrifugal_ecef(pos_ecef):
+    omega = Matrix([0,0,7.2921159e-5])
+    centrifugal = -omega.cross(omega.cross(pos_ecef))
+    return centrifugal
+
+def gravity_ecef(pos_ecef, vel_ecef=zeros(3,1)):
+    return gravitation_ecef(pos_ecef) + centrifugal_ecef(pos_ecef) + coriolis_ecef(vel_ecef)
+
+def quat_from_vectors(inertial_aligned, body_aligned, inertial_planar, body_planar):
+    inertial_aligned = inertial_aligned.normalized()
+    body_aligned = body_aligned.normalized()
+    inertial_planar = inertial_planar.normalized()
+    body_planar = body_planar.normalized()
+
+    inertial_dcm = zeros(3,3)
+    body_dcm = zeros(3,3)
+
+    inertial_dcm[0:3,0] = inertial_aligned
+    inertial_dcm[0:3,1] = inertial_aligned.cross(inertial_planar).normalized()
+    inertial_dcm[0:3,2] = inertial_aligned.cross(inertial_aligned.cross(inertial_planar).normalized()).normalized()
+
+    body_dcm[0:3,0] = body_aligned
+    body_dcm[0:3,1] = body_aligned.cross(body_planar).normalized()
+    body_dcm[0:3,2] = body_aligned.cross(body_aligned.cross(body_planar).normalized()).normalized()
+
+    return quat_from_matrix(body_dcm.T*inertial_dcm)
+
