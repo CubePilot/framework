@@ -29,7 +29,7 @@ static struct worker_thread_timer_task_s miss_print_task;
 static void miss_print_task_func(struct worker_thread_timer_task_s* task);
 
 RUN_AFTER(WORKER_THREADS_INIT) {
-    worker_thread_add_timer_task(&WT, &miss_print_task, miss_print_task_func, NULL, LL_MS2ST(5000), true);
+    worker_thread_add_timer_task(&WT, &miss_print_task, miss_print_task_func, NULL, chTimeMS2I(5000), true);
 }
 
 static void miss_print_task_func(struct worker_thread_timer_task_s* task) {
