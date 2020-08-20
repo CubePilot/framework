@@ -1,5 +1,5 @@
 #pragma once
-
+#if !defined(_FROM_ASM_)
 #include <stdint.h>
 
 #define STM32F427xx
@@ -17,6 +17,5 @@ extern uint8_t _param2_flash_sec_end;
 
 void board_get_unique_id(uint8_t* buf, uint8_t len);
 
-#if !defined(_FROM_ASM_)
 void boardInit(void);
 #endif /* _FROM_ASM_ */
