@@ -5,6 +5,7 @@
 static THD_FUNCTION(worker_thread_func, arg);
 
 static void worker_thread_wake_I(struct worker_thread_s* worker_thread);
+static void worker_thread_wake_S(struct worker_thread_s* worker_thread);
 static void worker_thread_wake(struct worker_thread_s* worker_thread);
 static void worker_thread_init_timer_task(struct worker_thread_timer_task_s* task, systime_t timer_begin_systime, systime_t timer_expiration_ticks, bool auto_repeat, timer_task_handler_func_ptr task_func, void* ctx);
 static void worker_thread_insert_timer_task_I(struct worker_thread_s* worker_thread, struct worker_thread_timer_task_s* task);
@@ -98,13 +99,18 @@ void worker_thread_timer_task_reschedule_I(struct worker_thread_s* worker_thread
     worker_thread_wake_I(worker_thread);
 }
 
-void worker_thread_timer_task_reschedule(struct worker_thread_s* worker_thread, struct worker_thread_timer_task_s* task, systime_t timer_expiration_ticks) {
-    chSysLock();
+void worker_thread_timer_task_reschedule_S(struct worker_thread_s* worker_thread, struct worker_thread_timer_task_s* task, systime_t timer_expiration_ticks) {
+    chDbgCheckClassS();
     _worker_thread_timer_task_reschedule_no_wake_I(worker_thread, task, timer_expiration_ticks);
-    chSysUnlock();
 
     // Wake worker thread to process tasks
-    worker_thread_wake(worker_thread);
+    worker_thread_wake_S(worker_thread);
+}
+
+void worker_thread_timer_task_reschedule(struct worker_thread_s* worker_thread, struct worker_thread_timer_task_s* task, systime_t timer_expiration_ticks) {
+    chSysLock();
+    worker_thread_timer_task_reschedule_S(worker_thread, task, timer_expiration_ticks);
+    chSysUnlock();
 }
 
 void worker_thread_remove_timer_task_I(struct worker_thread_s* worker_thread, struct worker_thread_timer_task_s* task) {
@@ -298,6 +304,12 @@ static void worker_thread_wake_I(struct worker_thread_s* worker_thread) {
     chDbgCheckClassI();
 
     chThdResumeI(&worker_thread->suspend_trp, MSG_TIMEOUT);
+}
+
+static void worker_thread_wake_S(struct worker_thread_s* worker_thread) {
+    chDbgCheckClassS();
+
+    chThdResumeS(&worker_thread->suspend_trp, MSG_TIMEOUT);
 }
 
 static void worker_thread_wake(struct worker_thread_s* worker_thread) {
