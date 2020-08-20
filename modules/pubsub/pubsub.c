@@ -129,7 +129,7 @@ void pubsub_publish_message(struct pubsub_topic_s* topic, size_t size, pubsub_me
         if (fifoallocator_peek_oldest(&topic->group->allocator) == message_to_delete) {
             fifoallocator_pop_oldest(&topic->group->allocator);
         }
-
+        chSchRescheduleS();
         chSysUnlock();
     }
 
