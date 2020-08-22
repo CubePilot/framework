@@ -200,9 +200,9 @@ static void process_slcan_cmd(struct slcan_instance_s* instance, size_t cmd_len)
         can_bridge_transmit(instance->can_instance, &frame);
 
         if (frame.IDE) {
-            chnWriteTimeout(&SDU1, (uint8_t*)"Z\r", 2, TIME_IMMEDIATE);
+            chnWriteTimeout(&SDU1, (uint8_t*)"Z\r", 2, chTimeMS2I(10));
         } else {
-            chnWriteTimeout(&SDU1, (uint8_t*)"z\r", 2, TIME_IMMEDIATE);
+            chnWriteTimeout(&SDU1, (uint8_t*)"z\r", 2, chTimeMS2I(10));
         }
     }
 }

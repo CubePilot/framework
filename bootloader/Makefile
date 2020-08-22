@@ -22,7 +22,6 @@ can_autobaud \
 uavcan \
 uavcan_nodestatus_publisher \
 uavcan_allocatee \
-spi_device \
 driver_profiLED \
 uavcan_timesync \
 uavcan_debug
@@ -32,9 +31,7 @@ uavcan.protocol.GetNodeInfo \
 uavcan.protocol.file.BeginFirmwareUpdate \
 uavcan.protocol.file.Read \
 uavcan.protocol.RestartNode \
-uavcan.equipment.indication.LightsCommand \
-com.hex.file.FileStreamStart \
-com.hex.file.FileStreamChunk
+uavcan.equipment.indication.LightsCommand
 
 DSDL_NAMESPACE_DIRS += dsdl/com
 

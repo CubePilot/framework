@@ -15,18 +15,6 @@
 #include <uavcan.protocol.RestartNode.h>
 #include <uavcan.protocol.GetNodeInfo.h>
 
-#ifdef MODULE_UAVCAN_DEBUG_ENABLED
-#include <modules/uavcan_debug/uavcan_debug.h>
-#define BL_DEBUG(...) uavcan_send_debug_msg(UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_DEBUG, "BL", __VA_ARGS__)
-#else
-#define BL_DEBUG(...) {}
-#endif
-
-#ifdef BOOTLOADER_SUPPORT_BROADCAST_UPDATE
-#include <com.hex.file.FileStreamStart.h>
-#include <com.hex.file.FileStreamChunk.h>
-#endif // BOOTLOADER_SUPPORT_BROADCAST_UPDATE
-
 #if __GNUC__ != 6 || __GNUC_MINOR__ != 3 || __GNUC_PATCHLEVEL__ != 1
 #error Please use arm-none-eabi-gcc 6.3.1.
 #endif
@@ -52,7 +40,6 @@ static const struct shared_hw_info_s _hw_info = BOARD_CONFIG_HW_INFO_STRUCTURE;
 static struct {
     bool in_progress;
     uint32_t ofs;
-    uint32_t read_req_ofs;
     uint32_t app_start_ofs;
     uint8_t uavcan_idx;
     uint8_t read_transfer_id;
@@ -60,9 +47,6 @@ static struct {
     uint8_t source_node_id;
     int32_t last_erased_page;
     char path[201];
-#ifdef BOOTLOADER_SUPPORT_BROADCAST_UPDATE
-    bool using_stream_mode;
-#endif // BOOTLOADER_SUPPORT_BROADCAST_UPDATE
 } flash_state;
 
 static struct {
@@ -80,18 +64,11 @@ static struct worker_thread_listener_task_s restart_req_listener_task;
 static struct worker_thread_timer_task_s delayed_restart_task;
 static struct worker_thread_listener_task_s getnodeinfo_req_listener_task;
 
-#ifdef BOOTLOADER_SUPPORT_BROADCAST_UPDATE
-static struct worker_thread_listener_task_s filestreamchunk_listener_task;
-static void filestreamchunk_handler(size_t msg_size, const void* buf, void* ctx);
-
-// static struct worker_thread_listener_task_s filestreamstart_res_listener_task;
-// static void filestreamstart_res_handler(size_t msg_size, const void* buf, void* ctx);
-#endif // BOOTLOADER_SUPPORT_BROADCAST_UPDATE
-
 static void file_beginfirmwareupdate_request_handler(size_t msg_size, const void* buf, void* ctx);
 static void begin_flash_from_path(uint8_t uavcan_idx, uint8_t source_node_id, const char* path);
 static void file_read_response_handler(size_t msg_size, const void* buf, void* ctx);
-static void do_send_read_request(bool retry);
+static void do_resend_read_request(void);
+static void do_send_read_request(void);
 static uint32_t get_app_sec_size(void);
 static void start_boot(struct worker_thread_timer_task_s* task);
 static void update_app_info(void);
@@ -133,14 +110,6 @@ RUN_AFTER(UAVCAN_INIT) {
 
     struct pubsub_topic_s* getnodeinfo_req_topic = uavcan_get_message_topic(0, &uavcan_protocol_GetNodeInfo_req_descriptor);
     worker_thread_add_listener_task(&WT, &getnodeinfo_req_listener_task, getnodeinfo_req_topic, getnodeinfo_req_handler, NULL);
-
-#ifdef BOOTLOADER_SUPPORT_BROADCAST_UPDATE
-    struct pubsub_topic_s* filestreamchunk_topic = uavcan_get_message_topic(0, &com_hex_file_FileStreamChunk_descriptor);
-    worker_thread_add_listener_task(&WT, &filestreamchunk_listener_task, filestreamchunk_topic, filestreamchunk_handler, NULL);
-
-//     struct pubsub_topic_s* filestreamstart_res_topic = uavcan_get_message_topic(0, &com_hex_file_FileStreamStart_res_descriptor);
-//     worker_thread_add_listener_task(&WT, &filestreamstart_res_listener_task, filestreamstart_res_topic, filestreamstart_res_handler, NULL);
-#endif // BOOTLOADER_SUPPORT_BROADCAST_UPDATE
 }
 
 static void getnodeinfo_req_handler(size_t msg_size, const void* buf, void* ctx) {
@@ -199,85 +168,16 @@ static void begin_flash_from_path(uint8_t uavcan_idx, uint8_t source_node_id, co
     cancel_boot_timer();
     memset(&flash_state, 0, sizeof(flash_state));
     flash_state.in_progress = true;
-    flash_state.ofs = 0;
-    flash_state.read_transfer_id = 255;
+    flash_state.ofs = 0; 
     flash_state.source_node_id = source_node_id;
     flash_state.uavcan_idx = uavcan_idx;
     strncpy(flash_state.path, path, 200);
-    worker_thread_add_timer_task(&WT, &read_timeout_task, read_request_response_timeout, NULL, chTimeMS2I(2000), false);
-    do_send_read_request(false);
+    worker_thread_add_timer_task(&WT, &read_timeout_task, read_request_response_timeout, NULL, chTimeMS2I(500), false);
+    do_send_read_request();
 
     corrupt_app();
     flash_state.last_erased_page = -1;
 }
-
-static void process_chunk(size_t chunk_size, const void* chunk) {
-    if (flash_state.ofs + chunk_size > get_app_sec_size()) {
-        do_fail_update();
-        BL_DEBUG("fail: file too large");
-        return;
-    }
-
-    if (chunk_size == 0) {
-        on_update_complete();
-        return;
-    }
-
-    int32_t curr_page = get_app_page_from_ofs(flash_state.ofs + chunk_size);
-    if (curr_page > flash_state.last_erased_page) {
-        for (int32_t i=flash_state.last_erased_page+1; i<=curr_page; i++) {
-            erase_app_page(i);
-        }
-    }
-
-    if (chunk_size < 256) {
-        struct flash_write_buf_s buf = {((chunk_size/FLASH_WORD_SIZE) + 1) * FLASH_WORD_SIZE, chunk};
-        flash_write((void*)get_app_address_from_ofs(flash_state.ofs), 1, &buf);
-        on_update_complete();
-    } else {
-        struct flash_write_buf_s buf = {chunk_size, chunk};
-        flash_write((void*)get_app_address_from_ofs(flash_state.ofs), 1, &buf);
-        flash_state.ofs += chunk_size;
-        do_send_read_request(false);
-    }
-}
-
-// TODO factor common code out of read_response_handler and filestreamchunk_handler
-#ifdef BOOTLOADER_SUPPORT_BROADCAST_UPDATE
-static void filestreamchunk_handler(size_t msg_size, const void* buf, void* ctx) {
-    (void)msg_size;
-    (void)ctx;
-
-    if (flash_state.in_progress) {
-        const struct uavcan_deserialized_message_s* msg_wrapper = buf;
-        const struct com_hex_file_FileStreamChunk_s *msg = (const struct com_hex_file_FileStreamChunk_s*)msg_wrapper->msg;
-
-        if (msg->path.path_len != strnlen(flash_state.path, 200) || memcmp(flash_state.path, msg->path.path, msg->path.path_len) != 0) {
-            // Not our stream
-            return;
-        }
-
-        flash_state.using_stream_mode = true;
-        worker_thread_timer_task_reschedule(&WT, &read_timeout_task, chTimeMS2I(2000));
-
-        if (msg->offset > flash_state.ofs) {
-            // We need to ask for the stream to go back to our offset
-            struct com_hex_file_FileStreamStart_req_s req;
-            req.path.path_len = strnlen(flash_state.path, 200);
-            req.offset = flash_state.ofs;
-            memcpy(req.path.path, flash_state.path, req.path.path_len);
-            uavcan_request(flash_state.uavcan_idx, &com_hex_file_FileStreamStart_req_descriptor, CANARD_TRANSFER_PRIORITY_MEDIUM+1, flash_state.source_node_id, &req);
-            return;
-        }
-
-        if (msg->offset != flash_state.ofs) {
-            return;
-        }
-
-        process_chunk(msg->data_len, msg->data);
-    }
-}
-#endif // BOOTLOADER_SUPPORT_BROADCAST_UPDATE
 
 static void file_read_response_handler(size_t msg_size, const void* buf, void* ctx) {
     (void)msg_size;
@@ -286,54 +186,53 @@ static void file_read_response_handler(size_t msg_size, const void* buf, void* c
         const struct uavcan_deserialized_message_s* msg_wrapper = buf;
         const struct uavcan_protocol_file_Read_res_s *res = (const struct uavcan_protocol_file_Read_res_s*)msg_wrapper->msg;
 
-        if (msg_wrapper->transfer_id != flash_state.read_transfer_id || flash_state.ofs != flash_state.read_req_ofs) {
+        if (msg_wrapper->transfer_id != flash_state.read_transfer_id) {
             return;
         }
 
-        if (res->error.value != 0) {
+        if (res->error.value != 0 || flash_state.ofs + res->data_len > get_app_sec_size()) {
             do_fail_update();
-            BL_DEBUG("fail: file read error");
             return;
         }
 
-        process_chunk(res->data_len, res->data);
+        if (res->data_len == 0) {
+            on_update_complete();
+            return;
+        }
+
+        int32_t curr_page = get_app_page_from_ofs(flash_state.ofs + res->data_len);
+        if (curr_page > flash_state.last_erased_page) {
+            for (int32_t i=flash_state.last_erased_page+1; i<=curr_page; i++) {
+                erase_app_page(i);
+            }
+        }
+
+        if (res->data_len < 256) {
+            struct flash_write_buf_s buf = {((res->data_len/FLASH_WORD_SIZE) + 1) * FLASH_WORD_SIZE, (void*)res->data};
+            flash_write((void*)get_app_address_from_ofs(flash_state.ofs), 1, &buf);
+            on_update_complete();
+        } else {
+            struct flash_write_buf_s buf = {res->data_len, (void*)res->data};
+            flash_write((void*)get_app_address_from_ofs(flash_state.ofs), 1, &buf);
+            flash_state.ofs += res->data_len;
+            do_send_read_request();
+        }
     }
 }
 
-static void do_send_read_request(bool retry) {
-
-#ifdef BOOTLOADER_SUPPORT_BROADCAST_UPDATE
-    if (!flash_state.using_stream_mode) {
-        struct uavcan_protocol_file_Read_req_s read_req;
-        flash_state.read_req_ofs = read_req.offset = flash_state.ofs;
-        strncpy((char*)read_req.path.path,flash_state.path,sizeof(read_req.path));
-        read_req.path.path_len = strnlen(flash_state.path,sizeof(read_req.path));
-        flash_state.read_transfer_id = uavcan_request(flash_state.uavcan_idx, &uavcan_protocol_file_Read_req_descriptor, CANARD_TRANSFER_PRIORITY_MEDIUM+1, flash_state.source_node_id, &read_req);
-    }
-
-    if ((retry && flash_state.using_stream_mode) || (flash_state.ofs < 2048 && !flash_state.using_stream_mode)) {
-        // attempt to start stream mode with the first few requests
-        struct com_hex_file_FileStreamStart_req_s req;
-        req.offset = flash_state.ofs;
-        req.path.path_len = strnlen(flash_state.path, 200);
-        memcpy(req.path.path, flash_state.path, req.path.path_len);
-        uavcan_request(flash_state.uavcan_idx, &com_hex_file_FileStreamStart_req_descriptor, CANARD_TRANSFER_PRIORITY_MEDIUM+1, flash_state.source_node_id, &req);
-    }
-#else
+static void do_resend_read_request(void) {
     struct uavcan_protocol_file_Read_req_s read_req;
     read_req.offset =  flash_state.ofs;
     strncpy((char*)read_req.path.path,flash_state.path,sizeof(read_req.path));
     read_req.path.path_len = strnlen(flash_state.path,sizeof(read_req.path));
-    flash_state.read_transfer_id = uavcan_request(flash_state.uavcan_idx, &uavcan_protocol_file_Read_req_descriptor, CANARD_TRANSFER_PRIORITY_MEDIUM+1, flash_state.source_node_id, &read_req);
-#endif
+    flash_state.read_transfer_id = uavcan_request(flash_state.uavcan_idx, &uavcan_protocol_file_Read_req_descriptor, CANARD_TRANSFER_PRIORITY_HIGH, flash_state.source_node_id, &read_req);
+    worker_thread_timer_task_reschedule(&WT, &read_timeout_task, chTimeMS2I(500));
+    flash_state.retries++;
+}
 
-    worker_thread_timer_task_reschedule(&WT, &read_timeout_task, chTimeMS2I(1000));
-
-    if (retry) {
-        flash_state.retries++;
-    } else {
-        flash_state.retries = 0;
-    }
+static void do_send_read_request(void) {
+    do_resend_read_request();
+    flash_state.retries = 0;
 }
 
 static uint32_t get_app_sec_size(void) {
@@ -388,7 +287,8 @@ static void corrupt_app(void) {
     update_app_info();
 }
 
-static void boot_app_if_commanded(void) {
+static void boot_app_if_commanded(void)
+{
     if (!get_boot_msg_valid() || boot_msg_id != SHARED_MSG_BOOT) {
         return;
     }
@@ -514,10 +414,9 @@ static void delayed_restart_func(struct worker_thread_timer_task_s* task) {
 static void read_request_response_timeout(struct worker_thread_timer_task_s* task) {
     (void)task;
     if (flash_state.in_progress) {
-        do_send_read_request(true);
-        if (flash_state.retries > 100) { // retry for 5 seconds
+        do_resend_read_request();
+        if (flash_state.retries > 10) { // retry for 5 seconds
             do_fail_update();
-            BL_DEBUG("fail: out of retries");
         }
     }
 }
