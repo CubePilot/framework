@@ -44,11 +44,11 @@ for msg in messages:
     message_dict[msg.full_name] = msg
 
 for template in templates:
-    with open(os.path.join(templates_dir, template['source_file']), 'rb') as f:
+    with open(os.path.join(templates_dir, template['source_file']), 'r') as f:
         template['source'] = f.read()
 
 def build_message(msg_name):
-    print 'building %s' % (msg_name,)
+    print('building %s' % (msg_name,))
     msg = message_dict[msg_name]
     for template in templates:
         output = em.expand(template['source'], msg=msg)
@@ -58,7 +58,7 @@ def build_message(msg_name):
 
         output_file = os.path.join(build_dir, em.expand('@{from canard_dsdlc_helpers import *}'+template['output_file'], msg=msg))
         mkdir_p(os.path.dirname(output_file))
-        with open(output_file, 'wb') as f:
+        with open(output_file, 'w') as f:
             f.write(output)
 
 if __name__ == '__main__':
@@ -86,10 +86,11 @@ if __name__ == '__main__':
     if buildlist is not None:
         for msg_name in buildlist:
             builtlist.add(msg_name)
-            pool.apply_async(build_message, (msg_name,))
+            build_message(msg_name)
+            # pool.apply_async(build_message, (msg_name,))
     else:
         for msg_name in [msg.full_name for msg in messages]:
-            print 'building %s' % (msg_name,)
+            print('building %s' % (msg_name,))
             builtlist.add(msg_name)
             pool.apply_async(build_message, (msg_name,))
 
