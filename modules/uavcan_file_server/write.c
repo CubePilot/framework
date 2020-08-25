@@ -21,6 +21,10 @@ RUN_AFTER(UAVCAN_INIT) {
     worker_thread_add_listener_task(&WT, &getdirentryinfo_req_listener_task, getdirentryinfo_req_topic, getdirentryinfo_req_listener_task_func, NULL);
 }
 
+systime_t tcall =0;
+
+FIL f;
+
 static void getdirentryinfo_req_listener_task_func(size_t msg_size, const void* buf, void* ctx) {
     (void)msg_size;
     (void)ctx;
@@ -30,32 +34,39 @@ static void getdirentryinfo_req_listener_task_func(size_t msg_size, const void* 
 
     struct uavcan_protocol_file_Write_res_s res;
     memset(&res, 0, sizeof(res));
+    
+    systime_t tnow = chVTGetSystemTimeX();
+    //this is a hack
+    if(tcall == 0 || (tnow - tcall) > 2000000) {
+        tcall = chVTGetSystemTimeX();
+        FATFS* fs = uSD_get_filesystem();
 
-    FATFS* fs = uSD_get_filesystem();
+        if (!fs) {
+            res.error.value = UAVCAN_PROTOCOL_FILE_ERROR_UNKNOWN_ERROR;
+            uavcan_respond(msg_wrapper->uavcan_idx, msg_wrapper, &res);
+            tcall=0;
+            return;
+        }
 
-    if (!fs) {
-        res.error.value = UAVCAN_PROTOCOL_FILE_ERROR_UNKNOWN_ERROR;
-        uavcan_respond(msg_wrapper->uavcan_idx, msg_wrapper, &res);
-        return;
-    }
+        char path[sizeof(req->path.path)];
 
-    FIL f;
-    char path[sizeof(req->path.path)];
+        memcpy(path, req->path.path, req->path.path_len);
 
-    memcpy(path, req->path.path, req->path.path_len);
+        path[req->path.path_len] = '\0';
 
-    path[req->path.path_len] = '\0';
-
-    if (f_open(&f, path, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
-        res.error.value = UAVCAN_PROTOCOL_FILE_ERROR_UNKNOWN_ERROR;
-        uavcan_respond(msg_wrapper->uavcan_idx, msg_wrapper, &res);
-        return;
+        if (f_open(&f, path, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
+            res.error.value = UAVCAN_PROTOCOL_FILE_ERROR_UNKNOWN_ERROR;
+            uavcan_respond(msg_wrapper->uavcan_idx, msg_wrapper, &res);
+            tcall=0;
+            return;
+        }
     }
 
     if(f_lseek(&f, req->offset) != FR_OK) {
         f_close(&f);
         res.error.value = UAVCAN_PROTOCOL_FILE_ERROR_UNKNOWN_ERROR;
         uavcan_respond(msg_wrapper->uavcan_idx, msg_wrapper, &res);
+        tcall=0;
         return;
     }
 
@@ -67,14 +78,22 @@ static void getdirentryinfo_req_listener_task_func(size_t msg_size, const void* 
         UINT bw;
         if (f_write(&f, req->data, req->data_len, &bw) != FR_OK) {
             res.error.value = UAVCAN_PROTOCOL_FILE_ERROR_UNKNOWN_ERROR;
+            tcall=0;
         }
 
         if (bw != req->data_len) { // this means the volume is full
             res.error.value = UAVCAN_PROTOCOL_FILE_ERROR_UNKNOWN_ERROR;
         }
+    }        
+
+    if(req->data_len != 192 && tcall > 0) {
+        tcall = 0;
+        f_close(&f);
+    } else {
+        tcall = chVTGetSystemTimeX();
     }
 
-    f_close(&f);
-
     uavcan_respond(msg_wrapper->uavcan_idx, msg_wrapper, &res);
+    
+    uavcan_send_debug_msg(UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_INFO, "write", "time %u", (chVTGetSystemTimeX() - tnow));
 }

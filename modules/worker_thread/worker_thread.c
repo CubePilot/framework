@@ -1,6 +1,7 @@
 #include "worker_thread.h"
 
 #include <common/helpers.h>
+#include <modules/uavcan_debug/uavcan_debug.h>
 
 static THD_FUNCTION(worker_thread_func, arg);
 
@@ -169,7 +170,7 @@ void worker_thread_add_publisher_task_I(struct worker_thread_s* worker_thread, s
     for (size_t i = 0; i < msg_queue_depth; i++) {
         chPoolAddI(&task->pool, chCoreAllocI(mem_block_size));
     }
-
+    
     LINKED_LIST_APPEND(struct worker_thread_publisher_task_s, worker_thread->publisher_task_list_head, task);
 }
 
@@ -217,6 +218,14 @@ void worker_thread_takeover(struct worker_thread_s* worker_thread) {
     chThdSetPriority(worker_thread->priority);
     worker_thread->thread = chThdGetSelfX();
 
+  int pubsubcount = 0;
+  systime_t pubsubtime=0;
+  int pubsublistcount = 0;
+  systime_t pubsublisttime=0;
+ int taskcount = 0;
+ systime_t tasktime=0;
+ systime_t report = chVTGetSystemTimeX();
+
     while (true) {
 #ifdef MODULE_PUBSUB_ENABLED
         // Handle publisher tasks
@@ -227,7 +236,10 @@ void worker_thread_takeover(struct worker_thread_s* worker_thread) {
             while (task) {
                 struct worker_thread_publisher_msg_s* msg;
                 while (chMBFetchTimeout(&task->mailbox, (msg_t*)&msg, TIME_IMMEDIATE) == MSG_OK) {
+                    pubsubcount++;
+                    systime_t tnow = chVTGetSystemTimeX();
                     pubsub_publish_message(msg->topic, msg->size, pubsub_copy_writer_func, msg->data);
+                    pubsubtime += chVTGetSystemTimeX() - tnow;
                     chPoolFree(&task->pool, msg);
                 }
                 chSysLock();
@@ -242,9 +254,19 @@ void worker_thread_takeover(struct worker_thread_s* worker_thread) {
             struct worker_thread_listener_task_s* listener_task = worker_thread->listener_task_list_head;
             chSysUnlock();
             while (listener_task) {
+                pubsublistcount++;
+                systime_t tnow = chVTGetSystemTimeX();
                 if (pubsub_listener_handle_one_timeout(&listener_task->listener, TIME_IMMEDIATE)) {
+                    pubsublisttime += chVTGetSystemTimeX() - tnow;
                     break;
+                } else {
+                    pubsublisttime += chVTGetSystemTimeX() - tnow;
                 }
+                
+                if((chVTGetSystemTimeX() - tnow) > 10000) {
+                    //uavcan_send_debug_msg(UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_INFO, "long", "item %u", (chVTGetSystemTimeX() - tnow));
+                }                
+                
                 chSysLock();
                 listener_task = listener_task->next;
                 chSysUnlock();
@@ -262,7 +284,10 @@ void worker_thread_takeover(struct worker_thread_s* worker_thread) {
             chSysUnlock();
 
             // Perform task
+            taskcount++;
+            systime_t tnow = chVTGetSystemTimeX();
             next_timer_task->task_func(next_timer_task);
+            tasktime += chVTGetSystemTimeX() - tnow;
 
             if (next_timer_task->auto_repeat) {
                 next_timer_task->timer_begin_systime = tnow_ticks;
@@ -291,6 +316,33 @@ void worker_thread_takeover(struct worker_thread_s* worker_thread) {
             chThdSuspendTimeoutS(&worker_thread->suspend_trp, ticks_to_next_timer_task);
 
             chSysUnlock();
+        }
+        
+        //124	14:16:01.675	INFO	load	idle 89.07% (4453873/5000048)
+
+        if((chVTGetSystemTimeX() - report) >= 1000000) {
+            report = chVTGetSystemTimeX();
+            //uavcan_send_debug_msg(UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_INFO, "thread", "pubs %s %u %u list %u %u tasks %u %u",worker_thread->name,pubsubcount,pubsubtime,pubsublistcount,pubsublisttime,taskcount,tasktime);
+            pubsubcount=0;
+            pubsubtime=0;
+            pubsublistcount=0;
+            pubsublisttime=0;
+            taskcount=0;
+            tasktime=0;
+            
+            int depth = 0;
+            chSysLock();
+            struct worker_thread_listener_task_s* listener_task = worker_thread->listener_task_list_head;
+            chSysUnlock();
+            while (listener_task) {
+                depth++;
+                chSysLock();
+                listener_task = listener_task->next;
+                chSysUnlock();
+            }
+            
+            //uavcan_send_debug_msg(UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_INFO, "depth", "depth %s %u ",worker_thread->name,depth);
+            
         }
     }
 }

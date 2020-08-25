@@ -15,8 +15,18 @@ static bool try_reformat(void) {
     return res == FR_OK;
 }
 
+static uint8_t sd_scratchpad[4096];
+
+
 RUN_AFTER(CH_SYS_INIT) {
-    sdcStart(&SDCD1, NULL);
+    
+    static SDCConfig sdcconfig = {
+  sd_scratchpad,
+  SDC_MODE_4BIT,
+  0
+};
+    
+    sdcStart(&SDCD1, &sdcconfig);
     if (sdcConnect(&SDCD1) != HAL_SUCCESS) {
         return;
     }

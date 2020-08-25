@@ -73,7 +73,7 @@ RUN_AFTER(UAVCAN_INIT) {
     worker_thread_add_listener_task(&WT, &timesync_tx_completion_listener, &msg_completion_topic, timesync_tx_completion_handler, NULL);
 
     last_failed_transmit_us64 = micros64();
-    worker_thread_timer_task_reschedule(&WT, &timer_task, chTimeMS2I(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS));
+    //worker_thread_timer_task_reschedule(&WT, &timer_task, chTimeMS2I(UAVCAN_PROTOCOL_GLOBALTIMESYNC_MIN_BROADCASTING_PERIOD_MS));
 }
 
 static void on_timeout(struct worker_thread_timer_task_s* task) {
