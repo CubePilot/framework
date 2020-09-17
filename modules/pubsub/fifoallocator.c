@@ -10,6 +10,7 @@ void fifoallocator_init(struct fifoallocator_instance_s* instance, size_t memory
         return;
     }
 
+    memset(memory_pool, 0, memory_pool_size);
     instance->memory_pool = memory_pool;
     instance->memory_pool_size = memory_pool_size;
     instance->newest = NULL;
