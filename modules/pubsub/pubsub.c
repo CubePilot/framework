@@ -2,6 +2,7 @@
 #include <common/helpers.h>
 #include <common/ctor.h>
 #include <string.h>
+#include <modules/uavcan_debug/uavcan_debug.h>
 
 #ifndef PUBSUB_DEFAULT_TOPIC_GROUP
 #error Please define PUBSUB_DEFAULT_TOPIC_GROUP in framework_conf.h.

@@ -14,17 +14,13 @@ system \
 pubsub \
 worker_thread \
 flash \
-param \
-uavcan_param_interface \
 can_driver_stm32 \
 can \
 can_autobaud \
 uavcan \
 uavcan_nodestatus_publisher \
 uavcan_allocatee \
-driver_profiLED \
-uavcan_timesync \
-uavcan_debug
+usb_slcan
 
 MESSAGES_ENABLED = \
 uavcan.protocol.GetNodeInfo \

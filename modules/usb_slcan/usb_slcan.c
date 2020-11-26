@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <modules/uavcan_debug/uavcan_debug.h>
 
 #ifndef USB_SLCAN_WORKER_THREAD
 #error Please define USB_SLCAN_WORKER_THREAD in framework_conf.h.
@@ -33,8 +34,11 @@ struct slcan_instance_s {
     bool ignore_next_frame;
     bool loopback_enable;
 
-    char cmd_buf[28];
+    char cmd_buf[64];
     size_t cmd_buf_len;
+    
+    mutex_t qmtx;
+    int failedwrite;
 };
 
 RUN_AFTER(CAN_INIT) {
@@ -49,6 +53,8 @@ RUN_AFTER(CAN_INIT) {
     instance.timestamp_enable = true;
     instance.flags_enable = false;
     instance.loopback_enable = false;
+    
+    chMtxObjectInit(&instance.qmtx);
 
     worker_thread_add_timer_task(&WT, &usb_connect_timer_task, usb_connect_timer_task_func, &instance, chTimeS2I(1), false);
     worker_thread_add_timer_task(&WT, &usb_rx_timer_task, usb_rx_timer_task_func, &instance, chTimeMS2I(1), true);
@@ -59,6 +65,10 @@ static void usb_connect_timer_task_func(struct worker_thread_timer_task_s* task)
     (void)task;
     usbStart(serusbcfg.usbp, &usbcfg);
     usbConnectBus(serusbcfg.usbp);
+    
+    struct slcan_instance_s* instance = worker_thread_task_get_user_context(task);
+    uavcan_send_debug_msg(UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_INFO, "sdu1", " writefail %u", instance->failedwrite);
+
 }
 
 static uint8_t hex_to_nibble(char c) {
@@ -199,11 +209,17 @@ static void process_slcan_cmd(struct slcan_instance_s* instance, size_t cmd_len)
 
         can_bridge_transmit(instance->can_instance, &frame);
 
+        chMtxLock(&instance->qmtx);
         if (frame.IDE) {
-            chnWriteTimeout(&SDU1, (uint8_t*)"Z\r", 2, chTimeMS2I(10));
+            int resp = chnWriteTimeout(&SDU1, (uint8_t*)"Z\r", 2, chTimeMS2I(50));
+            if (resp == 0)
+                instance->failedwrite++;
         } else {
-            chnWriteTimeout(&SDU1, (uint8_t*)"z\r", 2, chTimeMS2I(10));
+            int resp = chnWriteTimeout(&SDU1, (uint8_t*)"z\r", 2, chTimeMS2I(50));
+            if (resp == 0)
+                instance->failedwrite++;
         }
+        chMtxUnlock(&instance->qmtx);
     }
 }
 
@@ -297,5 +313,9 @@ static void can_rx_listener_task_func(size_t buf_size, const void* buf, void* ct
 
     slcan_frame[slcan_frame_len++] = '\r';
 
-    chnWriteTimeout(&SDU1, (uint8_t*)slcan_frame, slcan_frame_len, chTimeMS2I(10));
+    chMtxLock(&instance->qmtx);
+    int resp = chnWriteTimeout(&SDU1, (uint8_t*)slcan_frame, slcan_frame_len, chTimeMS2I(50));
+    if (resp == 0)
+        instance->failedwrite++;
+    chMtxUnlock(&instance->qmtx);
 }

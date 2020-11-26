@@ -195,33 +195,34 @@ static void can_driver_stm32_retreive_rx_frame_I(struct can_frame_s* frame, CAN_
     frame->DLC = mailbox->RDTR & CAN_RDT0R_DLC;
 }
 
-static void stm32_can_rx_handler(struct can_driver_stm32_instance_s* instance) {
+static void stm32_can_rx_handler(struct can_driver_stm32_instance_s* instance, uint8_t rxno) {
     systime_t rx_systime = chVTGetSystemTimeX();
-    while (true) {
-        chSysLockFromISR();
-        if ((instance->can->RF0R & CAN_RF0R_FMP0) == 0) {
+    if(rxno == 0)
+        while (true) {
+            chSysLockFromISR();
+            if ((instance->can->RF0R & CAN_RF0R_FMP0) == 0) {
+                chSysUnlockFromISR();
+                break;
+            }
+            struct can_frame_s frame;
+            can_driver_stm32_retreive_rx_frame_I(&frame, &instance->can->sFIFOMailBox[0]);
+            can_driver_rx_frame_received_I(instance->frontend, 0, rx_systime, &frame);
+            instance->can->RF0R = CAN_RF0R_RFOM0;
             chSysUnlockFromISR();
-            break;
         }
-        struct can_frame_s frame;
-        can_driver_stm32_retreive_rx_frame_I(&frame, &instance->can->sFIFOMailBox[0]);
-        can_driver_rx_frame_received_I(instance->frontend, 0, rx_systime, &frame);
-        instance->can->RF0R = CAN_RF0R_RFOM0;
-        chSysUnlockFromISR();
-    }
-
-    while (true) {
-        chSysLockFromISR();
-        if ((instance->can->RF1R & CAN_RF1R_FMP1) == 0) {
+    if(rxno == 1)
+        while (true) {
+            chSysLockFromISR();
+            if ((instance->can->RF1R & CAN_RF1R_FMP1) == 0) {
+                chSysUnlockFromISR();
+                break;
+            }
+            struct can_frame_s frame;
+            can_driver_stm32_retreive_rx_frame_I(&frame, &instance->can->sFIFOMailBox[1]);
+            can_driver_rx_frame_received_I(instance->frontend, 1, rx_systime, &frame);
+            instance->can->RF1R = CAN_RF1R_RFOM1;
             chSysUnlockFromISR();
-            break;
         }
-        struct can_frame_s frame;
-        can_driver_stm32_retreive_rx_frame_I(&frame, &instance->can->sFIFOMailBox[1]);
-        can_driver_rx_frame_received_I(instance->frontend, 1, rx_systime, &frame);
-        instance->can->RF1R = CAN_RF1R_RFOM1;
-        chSysUnlockFromISR();
-    }
 }
 
 #define CAN_TSR_RQCP(i) ((i==0) ? (CAN_TSR_RQCP0) : (i==1) ? (CAN_TSR_RQCP1) : (i==2) ? (CAN_TSR_RQCP2) : 0)
@@ -267,7 +268,15 @@ OSAL_IRQ_HANDLER(STM32_CAN1_TX_HANDLER) {
 OSAL_IRQ_HANDLER(STM32_CAN1_RX0_HANDLER) {
     OSAL_IRQ_PROLOGUE();
 
-    stm32_can_rx_handler(&can1_instance);
+    stm32_can_rx_handler(&can1_instance,0);
+
+    OSAL_IRQ_EPILOGUE();
+}
+
+OSAL_IRQ_HANDLER(STM32_CAN1_RX1_HANDLER) {
+    OSAL_IRQ_PROLOGUE();
+
+    stm32_can_rx_handler(&can1_instance,1);
 
     OSAL_IRQ_EPILOGUE();
 }
