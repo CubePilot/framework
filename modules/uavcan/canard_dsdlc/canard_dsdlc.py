@@ -1,4 +1,4 @@
-import uavcan.dsdl
+import pyuavcan_v0.dsdl
 import argparse
 import os
 import em
