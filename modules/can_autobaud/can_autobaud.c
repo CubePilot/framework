@@ -64,12 +64,18 @@ RUN_AFTER(CAN_INIT) {
 #endif
 
 #ifdef MODULE_BOOT_MSG_ENABLED
-    bool boot_msg_valid = get_boot_msg_valid();
+    // This is disabled because we have seen deployed bootloaders setting wrong baudrates
+    // if the timing is just right, e.g. around 1 to 1.5s after boot.
+    //
+    // Disabling this means that at worst we auto-baud again, or we just use the parameter
+    // in most cases anyway.
+    //
+    //bool boot_msg_valid = get_boot_msg_valid();
 
-    if (boot_msg_valid && is_baudrate_valid(boot_msg.canbus_info.baudrate)) {
-        canbus_baud = boot_msg.canbus_info.baudrate;
-        canbus_autobaud_enable = false;
-    }
+    //if (boot_msg_valid && is_baudrate_valid(boot_msg.canbus_info.baudrate)) {
+    //    canbus_baud = boot_msg.canbus_info.baudrate;
+    //    canbus_autobaud_enable = false;
+    //}
 #endif
 
     for (uint8_t i=0; i<LEN(valid_baudrates); i++) {
