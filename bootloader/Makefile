@@ -21,11 +21,8 @@ can \
 can_autobaud \
 uavcan \
 uavcan_nodestatus_publisher \
-uavcan_allocatee \
-spi_device \
-driver_profiLED \
-uavcan_timesync \
-uavcan_debug
+uavcan_allocatee\
+usb_slcan
 
 MESSAGES_ENABLED = \
 uavcan.protocol.GetNodeInfo \
