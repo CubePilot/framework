@@ -1,5 +1,5 @@
 import os
-import uavcan
+import dronecan
 import errno
 import em
 import math
@@ -123,36 +123,36 @@ def indent(string, n):
     return string
 
 def msg_header_name_request(obj):
-    if isinstance(obj, uavcan.dsdl.Field):
+    if isinstance(obj, dronecan.dsdl.Field):
         obj = obj.type
     assert obj.category == obj.CATEGORY_COMPOUND and obj.kind == obj.KIND_SERVICE
     return '%s_req.h' % (obj.full_name,)
 
 def msg_header_name_response(obj):
-    if isinstance(obj, uavcan.dsdl.Field):
+    if isinstance(obj, dronecan.dsdl.Field):
         obj = obj.type
     assert obj.category == obj.CATEGORY_COMPOUND and obj.kind == obj.KIND_SERVICE
     return '%s_res.h' % (obj.full_name,)
 
 def msg_header_name(obj):
-    if isinstance(obj, uavcan.dsdl.Field):
+    if isinstance(obj, dronecan.dsdl.Field):
         obj = obj.type
     return '%s.h' % (obj.full_name,)
 
 def msg_c_file_name_request(obj):
-    if isinstance(obj, uavcan.dsdl.Field):
+    if isinstance(obj, dronecan.dsdl.Field):
         obj = obj.type
     assert obj.category == obj.CATEGORY_COMPOUND and obj.kind == obj.KIND_SERVICE
     return '%s_req.c' % (obj.full_name,)
 
 def msg_c_file_name_response(obj):
-    if isinstance(obj, uavcan.dsdl.Field):
+    if isinstance(obj, dronecan.dsdl.Field):
         obj = obj.type
     assert obj.category == obj.CATEGORY_COMPOUND and obj.kind == obj.KIND_SERVICE
     return '%s_res.c' % (obj.full_name,)
 
 def msg_c_file_name(obj):
-    if isinstance(obj, uavcan.dsdl.Field):
+    if isinstance(obj, dronecan.dsdl.Field):
         obj = obj.type
     return '%s.c' % (obj.full_name,)
 
