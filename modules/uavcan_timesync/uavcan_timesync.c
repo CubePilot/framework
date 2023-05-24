@@ -196,6 +196,14 @@ static void timesync_message_handler(size_t msg_size, const void* buf, void* ctx
     prev_received_message_us64 = micros64_from_systime(msg_wrapper->rx_timestamp);
 }
 
+uint64_t uavcan_timesync_get_bus_time_at_us64_time(uint64_t us64_time) {
+    if (have_valid_systime_offset) {
+        return us64_time+systime_offset;
+    } else {
+        return 0;
+    }
+}
+
 uint64_t uavcan_timesync_get_bus_time_at_systime(systime_t systime) {
     if (have_valid_systime_offset) {
         return micros64_from_systime(systime)+systime_offset;
