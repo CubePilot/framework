@@ -178,6 +178,7 @@ static void file_beginfirmwareupdate_request_handler(size_t msg_size, const void
     const struct uavcan_protocol_file_BeginFirmwareUpdate_req_s* req = (const struct uavcan_protocol_file_BeginFirmwareUpdate_req_s*)msg_wrapper->msg;
 
     struct uavcan_protocol_file_BeginFirmwareUpdate_res_s res;
+    res.optional_error_message_len = 0;
     if (!flash_state.in_progress) {
         res.error = UAVCAN_PROTOCOL_FILE_BEGINFIRMWAREUPDATE_RES_ERROR_OK;
         uavcan_respond(msg_wrapper->uavcan_idx, msg_wrapper, &res);
@@ -282,7 +283,13 @@ static void file_read_response_handler(size_t msg_size, const void* buf, void* c
         const struct uavcan_deserialized_message_s* msg_wrapper = buf;
         const struct uavcan_protocol_file_Read_res_s *res = (const struct uavcan_protocol_file_Read_res_s*)msg_wrapper->msg;
 
-        if (msg_wrapper->transfer_id != flash_state.read_transfer_id || flash_state.ofs != flash_state.read_req_ofs) {
+        if (msg_wrapper->transfer_id != flash_state.read_transfer_id) {
+            BL_DEBUG("received read response with wrong transfer id");
+            return;
+        }
+
+        if (flash_state.ofs != flash_state.read_req_ofs) {
+            BL_DEBUG("received read response with wrong ofs %u expect %u", (unsigned)flash_state.read_req_ofs, (unsigned)flash_state.ofs);
             return;
         }
 
@@ -291,6 +298,8 @@ static void file_read_response_handler(size_t msg_size, const void* buf, void* c
             BL_DEBUG("fail: file read error");
             return;
         }
+
+        BL_DEBUG("received read response");
 
         process_chunk(res->data_len, res->data);
     }
@@ -317,7 +326,7 @@ static void do_send_read_request(bool retry) {
     }
 #else
     struct uavcan_protocol_file_Read_req_s read_req;
-    read_req.offset =  flash_state.ofs;
+    flash_state.read_req_ofs = read_req.offset = flash_state.ofs;
     strncpy((char*)read_req.path.path,flash_state.path,sizeof(read_req.path));
     read_req.path.path_len = strnlen(flash_state.path,sizeof(read_req.path));
     flash_state.read_transfer_id = uavcan_request(flash_state.uavcan_idx, &uavcan_protocol_file_Read_req_descriptor, CANARD_TRANSFER_PRIORITY_MEDIUM+1, flash_state.source_node_id, &read_req);
