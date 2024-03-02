@@ -23,7 +23,7 @@
 
 static void can_driver_stm32_start(void* ctx, bool silent, bool auto_retransmit, uint32_t baudrate);
 static void can_driver_stm32_stop(void* ctx);
-bool can_driver_stm32_abort_tx_mailbox_I(void* ctx, uint8_t mb_idx);
+void can_driver_stm32_abort_tx_mailbox_I(void* ctx, uint8_t mb_idx);
 bool can_driver_stm32_load_tx_mailbox_I(void* ctx, uint8_t mb_idx, struct can_frame_s* frame);
 
 static const struct can_driver_iface_s can_driver_stm32_iface = {
@@ -138,7 +138,7 @@ static void can_driver_stm32_stop(void* ctx) {
 }
 
 
-bool can_driver_stm32_abort_tx_mailbox_I(void* ctx, uint8_t mb_idx) {
+void can_driver_stm32_abort_tx_mailbox_I(void* ctx, uint8_t mb_idx) {
     struct can_driver_stm32_instance_s* instance = ctx;
 
     chDbgCheckClassI();
@@ -146,15 +146,11 @@ bool can_driver_stm32_abort_tx_mailbox_I(void* ctx, uint8_t mb_idx) {
     switch(mb_idx) {
         case 0:
             instance->can->TSR = CAN_TSR_ABRQ0;
-            return true;
         case 1:
             instance->can->TSR = CAN_TSR_ABRQ1;
-            return true;
         case 2:
             instance->can->TSR = CAN_TSR_ABRQ2;
-            return true;
     }
-    return false;
 }
 
 bool can_driver_stm32_load_tx_mailbox_I(void* ctx, uint8_t mb_idx, struct can_frame_s* frame) {
